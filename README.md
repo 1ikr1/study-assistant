@@ -157,12 +157,18 @@ study-assistant/
 │   ├── repo.py       数据访问层，所有 SQL 都收在这里
 │   ├── view_model.py 界面要用的数据组装（四个壳共用这一层）
 │   ├── config.py     读 .env（自己写的，20 行，不引 python-dotenv）
-│   ├── llm.py        大模型客户端（标准库 urllib，零依赖）
+│   ├── llm.py        大模型客户端（标准库 urllib，一个 HTTP POST）
 │   ├── coach.py      讲题：划清"算法判断"和"模型表达"的界线
 │   ├── seed.py       导入示例卡片与示例任务
 │   ├── cli.py        命令行入口（一条命令做一件事，适合脚本化）
 │   ├── session.py    终端里的交互式菜单
-│   ├── web.py        本地网页服务器（只用标准库 http.server）
+│   ├── web.py        FastAPI 应用 + uvicorn 启动 + 浏览器窗口管理
+│   ├── agent/        多 Agent 编排（LangGraph）
+│   │   ├── schemas.py      计划的强校验（白名单/步数/依赖/收尾）
+│   │   ├── workers.py      4 个子 Agent：2 个纯代码，2 个用模型
+│   │   ├── supervisor.py   主 Agent：分级判定 + 任务拆分
+│   │   ├── graph.py        把计划编译成 LangGraph 图
+│   │   └── orchestrator.py 首尾处理：降级 / 缺料 / 取成品
 │   ├── ui.html       工作台界面（HTML + CSS + 原生 JS，没有构建步骤）
 │   ├── desktop.py    原生窗口界面（tkinter，零下载）
 │   ├── icon.ico      应用图标（16/32/48/64/128/256 六种尺寸）
@@ -198,7 +204,7 @@ Windows PowerShell：
 ```powershell
 cd C:\Users\yv\Documents\Codex\study-coach
 
-# 用你装好的 Python 3.13（Phase 1 零依赖，不需要 pip install）
+# 用你装好的 Python 3.13
 $py = "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe"
 
 # 中文显示不乱码
@@ -524,7 +530,7 @@ $env:PYTHONIOENCODING = "utf-8"
 & "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe" -m unittest discover -s tests -v
 ```
 
-当前 **130 个测试全过**。测试覆盖的重点不是"代码跑不跑得通"，而是几个**容易悄悄写错的地方**：
+当前 **160 个测试全过**。测试覆盖的重点不是"代码跑不跑得通"，而是几个**容易悄悄写错的地方**：
 
 - 连续满分时，间隔必须是 `1 → 6 → 16`（第三次是 `6 × 2.7 = 16.2`，四舍五入到 16）
 - EF 有下限，反复答错也不能低于 1.3
@@ -552,27 +558,29 @@ $env:PYTHONIOENCODING = "utf-8"
 
 ## 八、技术选型
 
-| 层面 | Phase 1（现在） | 后续 | 为什么这么选 |
-| --- | --- | --- | --- |
-| 语言 | Python 3.11+ | — | 你已经装了 3.13 |
-| 存储 | SQLite（标准库 `sqlite3`） | Phase 2 换 SQLAlchemy + Alembic | 单机场景零运维；表结构写清楚了，迁移不痛 |
-| 调度算法 | 自己实现的 SM-2 | Phase 3 可切 FSRS | 冷启动阶段 SM-2 更稳；日志已备好，可回放对比 |
-| 命令行 | `argparse` | — | 标准库，零依赖 |
-| 网页界面 | `http.server`（标准库） | Phase 2 接流式输出时可换 FastAPI | 见下面那段解释 |
-| 测试 | `unittest` | — | 标准库，`python -m unittest` 直接跑 |
+| 层面 | 选型 | 为什么是它 |
+| --- | --- | --- |
+| 语言 | Python 3.11+ | — |
+| 存储 | SQLite | 单机单用户，零运维。表结构写清楚了，要换也不痛 |
+| 调度算法 | 自己实现的 SM-2 | 确定性计算，必须可复现、可测试、可重放 |
+| 命令行 | `argparse` | 标准库够用，换成任何 CLI 框架都没收益 |
+| **HTTP 层** | **FastAPI + uvicorn** | 接口涨到十几个之后，手写路由就没收益了；顺带白拿请求校验、SSE、并发、`/docs` |
+| **编排层** | **LangGraph** | 每次请求的图形状不同（节点和边来自计划），还要并行分支和事件流 |
+| 大模型调用 | 标准库 `urllib` | 就是一个 HTTP POST，装 SDK 只是包装 |
+| 测试 | `unittest` + `TestClient` | 标准库够用；`TestClient` 让接口测试不用起真服务器 |
 
-**Phase 1 刻意做到零第三方依赖**（`pyproject.toml` 里 `dependencies = []`）。
-原因很实在：依赖越少，越容易看到"整个程序到底怎么跑起来的"。
-这跟第一个项目（一上来就是 FastAPI + LangGraph + 向量库）正好形成对照，
-面试时能讲清楚"什么时候该引入框架，什么时候不该"。
+**选型原则：按场景适配度，不按"能不能用标准库"**。
 
-**为什么网页界面也坚持用标准库？**
+这条是踩过弯路的。最早我给项目定了一条"零依赖"的规矩，于是：
+用 `http.server` 手写路由、用 `tkinter` 画界面、用 `urllib` 调模型。
+前两个后来都换掉了 —— 不是因为它们不 work，而是**当需求涨到十几个接口、
+还要 SSE 流式输出时，自己维护这一层已经没有收益了**。
 
-一个网页应用本质上就是两件事：**一个能返回 HTML 的服务器 + 一个浏览器**。
-用 `http.server` 把这层写出来，正好能看清 FastAPI 到底在替你做什么
-（路由分发、请求体解析、JSON 序列化、错误处理）。
-等项目真需要 SSE 流式输出的时候再换 FastAPI——那时候的理由是
-「要处理长连接和并发」，而不是「因为大家都用」。
+反过来，SM-2 和 SQLite 一直没换：它们算的是确定性的东西，
+换任何框架都不会更好。
+
+所以判断标准是：**这东西解决的这个场景，它是不是最合适的？**
+能白拿能力就上框架，白拿不到就别上。
 
 ---
 

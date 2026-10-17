@@ -59,6 +59,18 @@ $py = "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe"
 
 ## 已知的坑（都是真踩过的，别再踩一遍）
 
+### 框架相关
+
+- **pythonw 下 uvicorn 会崩**：它的默认日志配置里有 `sys.stdout.isatty()`，
+  而 pythonw 的 `sys.stdout` 是 `None`。`serve()` 里已经按
+  `log_config = None if sys.stdout is None else ...` 处理，别再改回去。
+- **LangGraph 的 State 默认整体替换**：`results` 这种要累加的字典必须给
+  `Annotated[dict, reducer]`，否则并行分支会互相覆盖。
+- **sqlite 连接不能跨线程**：图里的节点会在线程池里跑，所以每个节点
+  `db.connect(path)` 自己开连接，别把主线程的 conn 传进去。
+- 沙箱里 pip 需要 `PYTHONPATH` 指一个改了 `tempfile.mkdtemp` 的垫片，
+  并且要清掉 `PIP_NO_INDEX`、设 `HTTPS_PROXY`。这是本机调试用的，不影响项目。
+
 ### Windows 环境
 
 - **`SO_REUSEADDR` 在 Windows 上语义不同**：它允许两个进程绑同一个端口。

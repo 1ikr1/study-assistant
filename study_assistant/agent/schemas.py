@@ -153,6 +153,17 @@ def _check_final_step(plan: Plan) -> None:
 
     这条不是洁癖：没有 report，前端就得自己拼一堆中间结果，
     而"把数据说成人话"正是这一步存在的意义。
+
+    另外，report 必须依赖**前面所有步骤**。这一条是加了图编排之后才发现的：
+    如果 report 只依赖 s1，那 s2 就是一条悬空分支 —— 图会跑它，
+    但它的结果永远进不了最终回答，等于白花钱。与其事后排查，不如直接拒掉。
     """
     if len(plan.items) > 1 and plan.items[-1].agent != "report":
         raise PlanError("多步骤计划的最后一步必须是 report")
+
+    if len(plan.items) > 1:
+        last = plan.items[-1]
+        others = {item.id for item in plan.items[:-1]}
+        missing = others - set(last.depends_on)
+        if missing:
+            raise PlanError(f"report 必须依赖前面所有步骤，缺：{sorted(missing)}")

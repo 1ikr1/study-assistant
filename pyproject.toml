@@ -1,11 +1,21 @@
 [project]
 name = "study-assistant"
-version = "0.1.0"
+version = "0.3.0"
 description = "个人学习助手：模型负责理解，算法负责调度"
 requires-python = ">=3.11"
-# Phase 1 刻意保持零依赖，只用到 Python 标准库。
-# 后续阶段会加入：fastapi / langgraph / sqlalchemy / sentence-transformers
-dependencies = []
+
+# 依赖只加在「框架能白拿能力」的地方：
+#   · fastapi/uvicorn —— HTTP 层：请求校验、SSE、并发、自动接口文档
+#   · langgraph       —— 编排层：动态图、依赖边、并行分支
+# 能算数的那部分（SM-2、SQLite）仍然不依赖任何库。
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "langgraph>=1.0",
+]
+
+[project.optional-dependencies]
+dev = ["httpx>=0.27"]      # 只给 FastAPI 的 TestClient 用
 
 [project.scripts]
 study = "study_assistant.cli:main"

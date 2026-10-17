@@ -292,6 +292,8 @@
   .trace-item.ok .dot2 { background:var(--green); }
   .trace-item.error .dot2 { background:var(--red); }
   .trace-item.degraded .dot2 { background:var(--yellow); }
+  .trace-item.running .dot2 { background:var(--blue); animation:pulse 1s infinite; }
+  @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.25 } }
   .dot2 { width:6px; height:6px; border-radius:50%; background:var(--dim2); flex:0 0 6px; }
 
   #offline {
@@ -443,7 +445,8 @@ function viewAssistant() {
     if (m.role === "user") {
       return `<div class="msg user"><div class="bubble">${esc(m.text)}</div></div>`;
     }
-    const badge = m.mode === "multi" ? `多 Agent · ${Math.max(0, (m.trace || []).length - 1)} 步`
+    const badge = m.mode === "pending" ? "协作中…"
+      : m.mode === "multi" ? "多 Agent 协作"
       : m.mode === "degraded" ? "计划不合规，已降级"
       : m.mode === "error" ? "出错"
       : "直接回答";
@@ -1097,31 +1100,80 @@ async function sendQuestion() {
   if (!q || S.chat.loading) return;
 
   S.chat.msgs.push({ role: "user", text: q });
+  const reply = { role: "assistant", text: "正在思考…", mode: "pending",
+                  reason: "", trace: [], streaming: true };
+  S.chat.msgs.push(reply);
+  S.chat.trace = [];
   S.chat.loading = true;
   render();
 
   try {
-    const r = await post("/api/agent/chat", { question: q });
-    S.chat.msgs.push({
-      role: "assistant",
-      text: r.answer || "（没有拿到回答）",
-      mode: r.ok === false ? "error" : r.mode,
-      reason: r.reason || "",
-      trace: r.trace || [],
-    });
-    S.chat.trace = r.trace || [];
+    await streamAgent(q, reply);
   } catch (err) {
-    S.chat.msgs.push({
-      role: "assistant", text: "出错了：" + err.message,
-      mode: "error", reason: "", trace: [],
-    });
-    S.chat.trace = [];
+    reply.text = "出错了：" + err.message;
+    reply.mode = "error";
   }
 
+  reply.streaming = false;
   S.chat.loading = false;
   render();
   const bottom = document.querySelector("#chat-bottom");
   if (bottom) bottom.scrollIntoView({ block: "end" });
+}
+
+/** 读 SSE：边跑边画。这是这轮改造里用户唯一能直接感知的部分。
+    20 多秒的协作，如果只在最后一次性吐出来，中间那 20 秒像卡死。 */
+async function streamAgent(question, reply) {
+  const res = await fetch("/api/agent/stream", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question }),
+  });
+  if (!res.ok || !res.body) throw new Error("HTTP " + res.status);
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    let cut;
+    while ((cut = buffer.indexOf("\n\n")) >= 0) {
+      const frame = buffer.slice(0, cut);
+      buffer = buffer.slice(cut + 2);
+      const line = frame.split("\n").find(x => x.startsWith("data: "));
+      if (!line) continue;
+      try { applyAgentEvent(reply, JSON.parse(line.slice(6))); } catch (e) { /* 坏帧跳过 */ }
+      render();
+    }
+  }
+}
+
+function applyAgentEvent(reply, ev) {
+  if (ev.type === "phase") {
+    reply.mode = "pending";
+  } else if (ev.type === "mode") {
+    reply.mode = ev.mode;
+    reply.reason = ev.reason || "";
+  } else if (ev.type === "step_start") {
+    S.chat.trace.push({
+      id: ev.id, agent: ev.agent, kind: ev.kind, status: "running", ms: 0,
+    });
+  } else if (ev.type === "step_end") {
+    const row = S.chat.trace.find(t => t.id === ev.id);
+    const data = { id: ev.id, agent: ev.agent, kind: ev.kind,
+                   status: ev.status, ms: ev.ms, output: ev.output };
+    if (row) Object.assign(row, data); else S.chat.trace.push(data);
+  } else if (ev.type === "answer") {
+    reply.text = ev.text || "（没有拿到回答）";
+    reply.mode = ev.mode || reply.mode;
+  } else if (ev.type === "error") {
+    reply.text = ev.message || "出错了";
+    reply.mode = "error";
+  }
 }
 
 async function loadExplain() {

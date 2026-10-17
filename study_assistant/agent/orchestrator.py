@@ -1,25 +1,27 @@
-"""编排：校验 → 派发 → 汇总。
+"""编排入口：Supervisor 判断 -> 编译图 -> 执行 -> 汇总。
 
-这是整个多 Agent 层的骨架，也是最该被测试覆盖的地方。
+分成三段，是因为三段都会出错，而且**出错的处理方式不同**：
 
-三个关键点：
+  1. Supervisor 的 JSON 不合规  ->  降级成直接回答（用户不该看到"解析失败"）
+  2. 某个子 Agent 崩了          ->  带着缺口继续，让 report 说明缺什么
+  3. 模型完全不可用             ->  往上抛，由 API 层翻译成人话
 
-1. **派发按顺序、只给该给的**。每个子 Agent 拿到的是它 args 加上它声明
-   依赖的那几步的结果，不是全部历史、也不是别人的输出。
-2. **单步失败不炸全局**。某一步挂了，把"这一步失败了"作为它的结果传下去，
-   让 report 去说明缺了什么 —— 比整个请求 500 好得多。
-3. **一定要有出口**。Supervisor 给的 JSON 不合规时，降级成直接回答，
-   而不是把解析错误甩给用户。
+编排本身（谁依赖谁、怎么并行）交给 LangGraph，这里只管首尾。
 """
 
 from __future__ import annotations
 
 import sqlite3
 import time
+from typing import Callable
 
-from study_assistant.agent import supervisor, workers
+from study_assistant import db
+from study_assistant.agent import graph as graph_mod
+from study_assistant.agent import supervisor
 from study_assistant.agent.schemas import PlanError
-from study_assistant.llm import ChatClient, LLMError
+from study_assistant.llm import ChatClient
+
+EventSink = Callable[[dict], None] | None
 
 
 def _preview(text: str, limit: int = 160) -> str:
@@ -27,39 +29,46 @@ def _preview(text: str, limit: int = 160) -> str:
     return text if len(text) <= limit else text[:limit] + "…"
 
 
-def run(conn: sqlite3.Connection, client: ChatClient, question: str) -> dict:
+def run(
+    conn: sqlite3.Connection,
+    client: ChatClient,
+    question: str,
+    on_event: EventSink = None,
+) -> dict:
     """跑一次完整的问答。
 
+    Args:
+        on_event: 每发生一件事就回调一次（给 SSE 用）。传 None 就只返回结果。
+
     Returns:
-        {
-          "mode": "direct" | "multi" | "degraded",
-          "answer": str,
-          "reason": str,
-          "trace": [ {step...} ],
-        }
+        {"mode": "direct"|"multi"|"degraded", "answer": str, "reason": str,
+         "trace": [{...}]}
 
     Raises:
-        LLMError: 模型完全不可用（没配 key / 网络不通）。
-                  这种情况由上层转成一句人话，不在这里吞掉。
+        LLMError: 模型完全不可用。
     """
+    emit = on_event or (lambda _e: None)
     question = (question or "").strip()
     if not question:
         return {"mode": "direct", "answer": "你想问什么？", "reason": "", "trace": []}
 
     trace: list[dict] = []
 
-    # ---- 第 1 步：让 Supervisor 判断 --------------------------------------
+    # ---- 1. Supervisor 判断 ----------------------------------------------
+    emit({"type": "phase", "phase": "supervisor"})
     t0 = time.perf_counter()
     try:
         decision = supervisor.decide(conn, client, question)
     except PlanError as exc:
-        # 模型给了不合规的计划 —— 降级，而不是报错
         answer = supervisor.fallback_direct(client, question, str(exc))
-        trace.append({
+        entry = {
             "id": "supervisor", "agent": "supervisor", "kind": "model",
             "status": "degraded", "ms": _ms(t0),
             "output": _preview(f"计划不合规（{exc}），已降级为直接回答"),
-        })
+        }
+        trace.append(entry)
+        emit({"type": "step_end", **entry})
+        emit({"type": "answer", "text": answer, "mode": "degraded"})
         return {"mode": "degraded", "answer": answer,
                 "reason": f"计划不合规：{exc}", "trace": trace}
 
@@ -70,49 +79,40 @@ def run(conn: sqlite3.Connection, client: ChatClient, question: str) -> dict:
             "直接回答" if decision.mode == "direct"
             else f"拆成 {len(decision.plan.items)} 步：{decision.reason}"),
     })
+    emit({"type": "mode", "mode": decision.mode,
+          "reason": decision.reason,
+          "steps": [i.id for i in decision.plan.items] if decision.plan else []})
 
     if decision.mode == "direct":
+        emit({"type": "answer", "text": decision.answer, "mode": "direct"})
         return {"mode": "direct", "answer": decision.answer,
                 "reason": "", "trace": trace}
 
-    # ---- 第 2 步：逐节点派发 ---------------------------------------------
+    # ---- 2. 编译并执行图 --------------------------------------------------
     plan = decision.plan
-    results: dict[str, str] = {}
 
-    for item in plan.items:
-        worker = workers.resolve(item.agent)
-        args = dict(item.args)
-        if item.agent == "report":
-            # report 必须知道用户问的是什么，否则只能写一段无头无尾的总结
-            args["question"] = question
-        upstream = {dep: results.get(dep, "") for dep in item.depends_on}
+    def sink(event: dict) -> None:
+        if event.get("type") == "step_end":
+            trace.append({k: event.get(k) for k in
+                          ("id", "agent", "kind", "status", "ms", "output")})
+        emit(event)
 
-        t1 = time.perf_counter()
-        try:
-            output = worker.run(conn, client, args, upstream)
-            status = "ok"
-        except LLMError:
-            raise                      # 模型不可用是全局问题，交给上层
-        except Exception as exc:        # noqa: BLE001
-            output = f"这一步失败了：{type(exc).__name__}: {exc}"
-            status = "error"
+    compiled = graph_mod.build(db.path_of(conn), client, plan, sink)
+    final = compiled.invoke({"question": question, "results": {}})
+    results: dict[str, str] = final.get("results", {})
 
-        results[item.id] = output
-        trace.append({
-            "id": item.id, "agent": item.agent, "kind": worker.kind,
-            "status": status, "ms": _ms(t1), "output": _preview(output),
-            "depends_on": list(item.depends_on),
-        })
-
-    # ---- 第 3 步：取出成品 -----------------------------------------------
+    # ---- 3. 取成品 --------------------------------------------------------
     last = plan.items[-1].id
     answer = results.get(last, "")
-    if not answer or trace[-1]["status"] == "error":
-        # 收尾那步挂了，别把中间结果当答案给用户
+    last_entry = next((t for t in trace if t.get("id") == last), {})
+
+    if not answer or last_entry.get("status") == "error":
         answer = supervisor.fallback_direct(client, question, "收尾失败")
+        emit({"type": "answer", "text": answer, "mode": "degraded"})
         return {"mode": "degraded", "answer": answer,
                 "reason": "收尾步骤失败", "trace": trace}
 
+    emit({"type": "answer", "text": answer, "mode": "multi"})
     return {"mode": "multi", "answer": answer, "reason": plan.reason, "trace": trace}
 
 

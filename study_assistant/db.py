@@ -147,3 +147,13 @@ def init_db(conn: sqlite3.Connection) -> None:
     """建表（幂等，重复调用不会报错）。"""
     conn.executescript(SCHEMA)
     conn.commit()
+
+
+def path_of(conn: sqlite3.Connection) -> str:
+    """取出这条连接指向的数据库文件路径。
+
+    为什么需要：LangGraph 可能在不同线程里并行跑子 Agent，而 sqlite 的连接
+    不能跨线程共用。所以每个节点要按路径自己开一条连接 —— 路径从这里拿。
+    """
+    row = conn.execute("PRAGMA database_list").fetchone()
+    return str(row["file"]) if row and row["file"] else ""
