@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.tmp-tests/
+.tmp-check/
+# API key 绝对不能进仓库
+.env
+data/study.db
+data/study.db-wal
+data/study.db-shm

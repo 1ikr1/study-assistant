@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>study-coach · 备考工作台</title>
+<meta name="theme-color" content="#f4f6f8">
+<!-- 图标和应用图标是同一套：圆角方块 + 祖母绿渐变 + 白色沙漏。
+     这里用 SVG 内联，任何缩放下都锐利；icon.ico 是同一张图的位图版本。 -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%2352e0a5'/%3E%3Cstop offset='1' stop-color='%230e7a57'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Crect x='13' y='9.4' width='38' height='3.6' rx='1.8' fill='%23fff' opacity='.88'/%3E%3Crect x='13' y='51' width='38' height='3.6' rx='1.8' fill='%23fff' opacity='.88'/%3E%3Cpolygon points='16.6,13 47.4,13 32,30.2' fill='%23fff'/%3E%3Cpolygon points='32,33.8 47.4,51 16.6,51' fill='%23fff'/%3E%3C/svg%3E">
+<style>
+  /* ---------------------------------------------------------------
+     配色变量。默认浅色（白底 + 绿色点缀），
+     点侧边栏底部的按钮可以切深色。所有颜色都从这里取，
+     所以换主题不用改任何一条规则。
+     --------------------------------------------------------------- */
+  :root {
+    --bg:#f4f6f8; --side:#ffffff; --panel:#ffffff; --panel2:#f3f5f7;
+    --line:#e7eaee; --line2:#dce1e7;
+    --fg:#171b20; --dim:#6b7480; --dim2:#9ba3ad;
+    --green:#1e9e68; --blue:#2f7bd6; --blue-d:#1d5fa8; --purple:#7a5cd0;
+    --yellow:#b5821b; --red:#d64a4a;
+    --accent-g1:#46d39a; --accent-g2:#12805a;
+    --on-accent:#ffffff;
+    --ct-g1:#eef7f2; --ct-g2:#e7f2eb;
+    --green-tint:rgba(30,158,104,.10);
+    --red-tint:rgba(214,74,74,.10);
+    --glass-line:#c9d2da;
+    --bar-empty:#e6eaee;
+    --track:#e9edf1;
+    --scroll:#cdd5dd;
+    --btn-hover:#e9edf1;
+    --overlay:rgba(244,246,248,.95);
+    --shadow:0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.05);
+  }
+  html.dark {
+    --bg:#0b0f14; --side:#0f141a; --panel:#141a21; --panel2:#1a212a;
+    --line:#232c36; --line2:#2b3745;
+    --fg:#e6edf3; --dim:#7d8b9c; --dim2:#5a6675;
+    --green:#3fd68f; --blue:#5aa9ff; --blue-d:#2b5f9e; --purple:#b98cff;
+    --yellow:#e0b341; --red:#ff6b6b;
+    --accent-g1:#3fd68f; --accent-g2:#1f7a52;
+    --on-accent:#04120c;
+    --ct-g1:#16222c; --ct-g2:#121820;
+    --green-tint:rgba(63,214,143,.10);
+    --red-tint:rgba(255,107,107,.10);
+    --glass-line:#2b3745;
+    --bar-empty:#232c36;
+    --track:#1a212a;
+    --scroll:#243040;
+    --btn-hover:#1f2833;
+    --overlay:rgba(11,15,20,.95);
+    --shadow:none;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { height:100%; }
+  body {
+    background:var(--bg); color:var(--fg); height:100vh; overflow:hidden;
+    font-family:-apple-system,"Segoe UI","Microsoft YaHei UI","Microsoft YaHei",sans-serif;
+    font-size:14px; line-height:1.65; display:flex;
+    -webkit-font-smoothing:antialiased;
+  }
+  button { font:inherit; cursor:pointer; border:0; background:none; color:inherit; }
+  ::-webkit-scrollbar { width:9px; height:9px; }
+  ::-webkit-scrollbar-thumb { background:var(--scroll); border-radius:5px; }
+
+  /* ---- 左侧栏 ---- */
+  aside {
+    width:212px; flex:0 0 212px; background:var(--side);
+    border-right:1px solid var(--line); display:flex; flex-direction:column;
+    padding:16px 12px;
+  }
+  .brand { display:flex; align-items:center; gap:9px; padding:2px 8px 14px; }
+  .brand .logo {
+    width:26px; height:26px; border-radius:8px; flex:0 0 26px;
+    background:linear-gradient(145deg,var(--accent-g1),var(--accent-g2));
+    display:flex; align-items:center; justify-content:center; font-size:13px; color:#fff;
+  }
+  .brand b { font-size:14px; font-weight:600; }
+
+  .countdown {
+    background:linear-gradient(160deg,var(--ct-g1),var(--ct-g2));
+    border:1px solid var(--line); border-radius:11px;
+    padding:12px 14px; margin:0 2px 14px;
+  }
+  .countdown .n { font-size:27px; font-weight:700; color:var(--green); line-height:1.25; }
+  .countdown .n small { font-size:12px; color:var(--dim); font-weight:400; margin-left:3px; }
+  .countdown .d { font-size:11.5px; color:var(--dim2); margin-top:1px; }
+  .countdown .stage {
+    margin-top:9px; font-size:11.5px; color:var(--green);
+    background:var(--green-tint); border-radius:5px; padding:2px 8px;
+    display:inline-block;
+  }
+
+  .navgroup { margin-bottom:4px; }
+  .navgroup .t { font-size:11px; color:var(--dim2); padding:9px 10px 5px; letter-spacing:.5px; }
+  .nav {
+    display:flex; align-items:center; gap:9px; width:100%;
+    padding:8px 11px; border-radius:8px; color:var(--dim);
+    font-size:13.5px; text-align:left; margin-bottom:2px;
+  }
+  .nav:hover { background:var(--panel); color:var(--fg); }
+  .nav.on { background:var(--panel2); color:var(--fg); font-weight:500; }
+  .nav.on .dot { background:var(--green); }
+  .dot { width:5px; height:5px; border-radius:50%; background:var(--dim2); flex:0 0 5px; }
+  .aside-foot { margin-top:auto; padding-top:12px; border-top:1px solid var(--line); }
+  .aside-foot .nav { color:var(--dim); }
+  .aside-foot .nav:hover { color:var(--fg); }
+  .aside-hint {
+    font-size:10.5px; color:var(--dim2); line-height:1.6;
+    padding:6px 10px 2px; display:none;
+  }
+  .aside-hint.show { display:block; }
+
+  /* ---- 主区 ---- */
+  main { flex:1; overflow-y:auto; padding:22px 26px 60px; }
+  .head { display:flex; align-items:flex-end; gap:14px; margin-bottom:20px; }
+  .head h1 { font-size:20px; font-weight:600; letter-spacing:.3px; }
+  .head .sub { color:var(--dim); font-size:12.5px; padding-bottom:3px; }
+  .head .right { margin-left:auto; display:flex; gap:8px; align-items:center; }
+
+  .cols { display:flex; gap:20px; align-items:flex-start; }
+  .col-main { flex:1; min-width:0; }
+  .col-side { width:262px; flex:0 0 262px; }
+
+  .card {
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:12px; padding:18px; margin-bottom:14px;
+    box-shadow:var(--shadow);
+  }
+  .card h2 {
+    font-size:13.5px; font-weight:600; margin-bottom:13px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .card h2 .hint { font-weight:400; color:var(--dim2); font-size:11.5px; }
+  .card h2 .more { margin-left:auto; color:var(--dim); font-size:11.5px; cursor:pointer; }
+
+  .btn {
+    background:var(--panel2); border:1px solid var(--line); color:var(--fg);
+    border-radius:8px; padding:7px 14px; font-size:13px;
+  }
+  .btn:hover { border-color:var(--line2); background:var(--btn-hover); }
+  .btn.primary {
+    background:linear-gradient(180deg,var(--accent-g1),var(--accent-g2));
+    border:0; color:var(--on-accent); font-weight:600;
+  }
+  .btn.primary:hover { filter:brightness(1.08); }
+  .btn.tiny { padding:4px 10px; font-size:12px; }
+  .btn.danger:hover { border-color:var(--red); color:var(--red); }
+
+  /* ---- 今日行动 ---- */
+  .stats4 { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:14px; }
+  .stat { background:var(--panel); border:1px solid var(--line); border-radius:11px; padding:13px 14px; }
+  .stat .k { font-size:11.5px; color:var(--dim); }
+  .stat .v { font-size:22px; font-weight:700; margin-top:2px; }
+  .stat .v small { font-size:11.5px; color:var(--dim); font-weight:400; margin-left:2px; }
+  .stat.g .v { color:var(--green); }
+  .stat.b .v { color:var(--blue); }
+  .stat.y .v { color:var(--yellow); }
+
+  .task {
+    display:flex; align-items:center; gap:11px; padding:10px 2px;
+    border-bottom:1px solid var(--line); font-size:13.5px;
+  }
+  .task:last-child { border-bottom:0; }
+  .task .box {
+    width:17px; height:17px; flex:0 0 17px; border-radius:5px;
+    border:1.5px solid var(--line2); display:flex; align-items:center;
+    justify-content:center; font-size:11px; color:transparent; cursor:pointer;
+  }
+  .task .box:hover { border-color:var(--green); }
+  .task.done .box { background:var(--green); border-color:var(--green); color:var(--on-accent); }
+  .task.done .name { color:var(--dim2); text-decoration:line-through; }
+  .task .name { flex:1; }
+  .task .meta { font-size:11.5px; color:var(--dim2); }
+  .pri {
+    font-size:10.5px; padding:1px 8px; border-radius:20px;
+    background:var(--panel2); color:var(--dim);
+  }
+  .pri.p1 { color:var(--red); }
+  .pri.p2 { color:var(--yellow); }
+  .pri.p3 { color:var(--dim2); }
+
+  /* ---- 专注计时 ---- */
+  .timerwrap { display:flex; gap:22px; align-items:center; }
+  .glass { width:132px; flex:0 0 132px; }
+  .timerbox { flex:1; }
+  .timerbox .big {
+    font-size:52px; font-weight:300; letter-spacing:2px;
+    font-variant-numeric:tabular-nums; line-height:1.1;
+  }
+  .timerbox .lbl { color:var(--dim); font-size:12.5px; margin-bottom:2px; }
+  .timerbox .acting { color:var(--green); font-size:12.5px; margin-top:6px; min-height:20px; }
+  .timerbtns { display:flex; gap:9px; margin-top:16px; }
+  .presets { display:flex; gap:7px; margin-top:14px; }
+  .presets button {
+    flex:1; background:var(--panel2); border:1px solid var(--line);
+    border-radius:8px; padding:7px 0; font-size:12.5px; color:var(--dim);
+  }
+  .presets button.on { border-color:var(--green); color:var(--green); background:rgba(63,214,143,.08); }
+
+  /* ---- 右栏 ---- */
+  .prog { height:6px; background:var(--track); border-radius:3px; overflow:hidden; margin:9px 0 7px; }
+  .prog i { display:block; height:100%; background:linear-gradient(90deg,var(--accent-g1),var(--blue)); }
+  .big-num { font-size:26px; font-weight:700; }
+  .big-num small { font-size:12px; color:var(--dim); font-weight:400; }
+
+  .rhythm { display:flex; align-items:flex-end; gap:5px; height:64px; margin-top:6px; }
+  .rhythm .col { flex:1; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; gap:4px; }
+  .rhythm .bar {
+    width:100%; border-radius:3px; min-height:3px;
+    background:linear-gradient(180deg,var(--accent-g1),var(--accent-g2));
+  }
+  .rhythm .bar.zero { background:var(--bar-empty); }
+  .rhythm .bar.blue { background:linear-gradient(180deg,var(--blue),var(--blue-d)); }
+  .rhythm .d { font-size:10px; color:var(--dim2); }
+
+  /* ---- 复习 ---- */
+  .tag { font-size:11.5px; color:var(--purple); letter-spacing:.4px; }
+  .q { font-size:20px; font-weight:500; line-height:1.6; margin:8px 0 6px; }
+  .ans {
+    background:var(--panel2); border-left:3px solid var(--green);
+    border-radius:0 8px 8px 0; padding:13px 16px; margin-top:14px;
+    font-size:14.5px; white-space:pre-wrap;
+  }
+  .ratings { display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin-top:14px; }
+  .ratings button { background:var(--panel2); border:1px solid var(--line); border-radius:9px; padding:9px 2px; text-align:center; }
+  .ratings button:hover { border-color:var(--green); }
+  .ratings .n { display:block; font-size:17px; font-weight:700; line-height:1.2; }
+  .ratings .l { display:block; font-size:10.5px; color:var(--dim); }
+  .ratings .good .n { color:var(--green); }
+  .ratings .bad .n { color:var(--yellow); }
+  .ratings .zero .n { color:var(--red); }
+  .line { height:5px; background:var(--track); border-radius:3px; overflow:hidden; margin-bottom:14px; }
+  .line i { display:block; height:100%; background:var(--green); }
+
+  .toast {
+    margin-top:12px; padding:11px 14px; border-radius:8px; font-size:13px;
+    background:var(--green-tint); border:1px solid transparent;
+  }
+  .toast.bad { background:var(--red-tint); }
+
+  /* ---- 表格 ---- */
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th,td { text-align:right; padding:8px 6px; border-bottom:1px solid var(--line); }
+  th:first-child,td:first-child { text-align:left; }
+  th { color:var(--dim); font-weight:400; font-size:12px; }
+
+  .empty { color:var(--dim2); text-align:center; padding:34px 0; font-size:13.5px; }
+  .mini { color:var(--dim2); font-size:11.5px; margin-top:9px; }
+  .row { display:flex; gap:9px; align-items:center; flex-wrap:wrap; }
+  .spacer { flex:1; }
+  input[type=text],input[type=number],select {
+    background:var(--panel2); border:1px solid var(--line); color:var(--fg);
+    border-radius:7px; padding:7px 10px; font:inherit; font-size:13px;
+  }
+  input:focus,select:focus { outline:none; border-color:var(--green); }
+  label.sw { display:inline-flex; align-items:center; gap:7px; color:var(--dim); font-size:12.5px; cursor:pointer; }
+
+  /* 沙漏的框架用 CSS 上色（写成 SVG 属性的话，主题变量就失效了） */
+  .glass-frame { fill:none; stroke:var(--glass-line); stroke-width:2; }
+  .glass-cap { fill:var(--glass-line); }
+
+  #offline {
+    position:fixed; inset:0; background:var(--overlay); z-index:99;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #offline[hidden] { display:none; }
+  #offline .box {
+    background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:32px 36px; max-width:440px; text-align:center;
+  }
+  #offline h2 { font-size:18px; margin-bottom:10px; }
+  #offline p { color:var(--dim); font-size:13.5px; margin-bottom:20px; line-height:1.85; }
+</style>
+</head>
+<body>
+<aside>
+  <div class="brand"><span class="logo">✦</span><b>study-coach</b></div>
+  <div class="countdown" id="countdown"></div>
+  <div class="navgroup" id="nav-main"></div>
+  <div class="navgroup" id="nav-extra"></div>
+  <div class="aside-foot">
+    <button class="nav" id="theme"><span class="dot"></span>深色主题</button>
+    <button class="nav" id="quit"><span class="dot"></span>关闭应用</button>
+    <div class="aside-hint" id="fs-hint">
+      当前是全屏，由浏览器管着。<br>按 <b>F11</b> 退出，<b>Alt+F4</b> 关窗口。
+    </div>
+  </div>
+</aside>
+
+<main>
+  <div class="head">
+    <h1 id="page-title">今日行动</h1>
+    <div class="sub" id="page-sub"></div>
+  </div>
+  <div id="view"></div>
+</main>
+
+<div id="offline" hidden>
+  <div class="box">
+    <h2 id="offline-title">后台服务已经停了</h2>
+    <p id="offline-msg"></p>
+    <button class="btn" id="offline-reconnect" onclick="location.reload()">重新连接</button>
+  </div>
+</div>
+<script>
+/* ===================== 通用 ===================== */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+async function api(path, options) {
+  let res;
+  try { res = await fetch(path, options); }
+  catch (err) { showOffline("连不上后台服务，它可能已经被关掉了。"); throw err; }
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+const post = (p, b) => api(p, {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(b),
+});
+function showOffline(msg) {
+  if (msg) $("#offline-msg").textContent = msg;
+  $("#offline").hidden = false;
+}
+const hhmm = (sec) => `${String(Math.floor(sec / 3600)).padStart(2, "0")}:`
+  + `${String(Math.floor(sec % 3600 / 60)).padStart(2, "0")}`;
+function mmss(sec) {
+  const s = Math.max(0, Math.round(sec));
+  return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+}
+const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
+const PAGE_IDS = ["today", "plan", "focus", "review", "insight", "settings"];
+const MAX_INDEX = 5;
+const RATE_LABELS = ["完全不会", "错了但记得", "错了但想起", "很吃力", "有点犹豫", "完美"];
+
+/* ===================== 状态 ===================== */
+const PAGES = [
+  { id: "today", label: "今日行动", group: "main", hint: "今天最值得先完成的事" },
+  { id: "plan", label: "安排计划", group: "main", hint: "按科目安排每天做什么" },
+  { id: "focus", label: "开始专注", group: "main", hint: "交给沙漏，时间流完就休息" },
+  { id: "review", label: "错题复习", group: "main", hint: "算法决定什么时候该复习" },
+  { id: "insight", label: "学习洞察", group: "extra", hint: "你的数据长什么样" },
+  { id: "settings", label: "设置与数据", group: "extra", hint: "画像与数据库" },
+];
+
+const S = {
+  page: "today",
+  dash: null, queue: [], stats: null, forecast: [], staged: [],
+  index: 0, revealed: false, stagedMode: false, done: 0, right: 0,
+  toast: null, busy: false,
+  prev: null,        // 刚打完分的那张卡 {card, rating} —— AI 讲题要用
+  explain: null,     // 讲题结果 {loading, ok, text, model}
+  timer: { total: 50 * 60, remain: 50 * 60, running: false, taskId: null, tick: null },
+};
+function toast(text, bad = false) { S.toast = { text, bad }; }
+
+/* ===================== 取数 ===================== */
+async function refresh() {
+  const [dash, q, st, fc, sg] = await Promise.all([
+    api("/api/dashboard"), api("/api/queue"), api("/api/stats"),
+    api("/api/forecast?days=7"), api("/api/staged"),
+  ]);
+  S.dash = dash; S.queue = q.cards; S.stats = st;
+  S.forecast = fc.days; S.staged = sg.items;
+  if (S.index > S.queue.length) S.index = S.queue.length;
+  render();
+}
+
+/* ===================== 骨架 ===================== */
+function stageOf(d) {
+  if (d.countdown_days === null) return "";
+  if (d.countdown_days > 180) return "基础阶段";
+  if (d.countdown_days > 60) return "强化阶段";
+  return "冲刺阶段";
+}
+
+function renderShell() {
+  const d = S.dash;
+  $("#countdown").innerHTML = d.countdown_days === null
+    ? `<div class="n" style="font-size:16px;color:var(--dim)">未设定考试日期</div>
+       <div class="d">在「设置与数据」里填上就出来了</div>`
+    : `<div class="n">${d.countdown_days}<small>天后考试</small></div>
+       <div class="d">${esc(d.exam_date || "")}</div>
+       <div class="stage">${stageOf(d)}</div>`;
+
+  const draw = (group, host) => {
+    $(host).innerHTML = (group === "extra" ? `<div class="t">复盘与资料</div>` : "")
+      + PAGES.filter(p => p.group === group).map(p => `
+        <button class="nav ${p.id === S.page ? "on" : ""}" data-page="${p.id}">
+          <span class="dot"></span>${p.label}</button>`).join("");
+  };
+  draw("main", "#nav-main");
+  draw("extra", "#nav-extra");
+
+  const page = PAGES.find(p => p.id === S.page);
+  $("#page-title").textContent = page.label;
+  $("#page-sub").textContent = page.hint;
+}
+
+/* ===================== 今日行动 ===================== */
+function viewToday() {
+  const d = S.dash;
+  const pct = d.focus_target_seconds
+    ? Math.min(100, Math.round(d.focus_seconds_today / d.focus_target_seconds * 100)) : 0;
+  const taskPct = d.tasks_total ? Math.round(d.tasks_done / d.tasks_total * 100) : 0;
+  return `
+  <div class="cols">
+    <div class="col-main">
+      <div class="stats4">
+        <div class="stat g"><div class="k">今日专注</div>
+          <div class="v">${hhmm(d.focus_seconds_today)}<small>/ ${hhmm(d.focus_target_seconds)}</small></div></div>
+        <div class="stat b"><div class="k">到期错题</div>
+          <div class="v">${d.due_total}<small>张</small></div></div>
+        <div class="stat y"><div class="k">今日复习</div>
+          <div class="v">${d.reviewed_today}<small>次</small></div></div>
+        <div class="stat"><div class="k">整体掌握度</div>
+          <div class="v">${(d.mastery * 100).toFixed(0)}<small>%</small></div></div>
+      </div>
+      <div class="card">
+        <h2>今天该做这几件 <span class="hint">${d.tasks_done}/${d.tasks_total}</span>
+          <span class="more" data-page="plan">去安排 →</span></h2>
+        ${taskList(true)}
+      </div>
+      <div class="card">
+        <h2>现在最值得先做的</h2>
+        ${d.due_total ? `<div class="row">
+          <div><div style="font-size:15px">有 ${d.due_total} 张卡到期了</div>
+            <div class="mini" style="margin-top:2px">按每天
+              ${esc(d.profile.daily_minutes || "?")} 分钟的预算，本轮过 ${d.due_now} 张</div></div>
+          <div class="spacer"></div>
+          <button class="btn primary" data-page="review">开始复习</button></div>`
+        : `<div class="row">
+          <div><div style="font-size:15px">今天没有到期的卡片</div>
+            <div class="mini" style="margin-top:2px">算法安排你休息，去专注别的吧</div></div>
+          <div class="spacer"></div>
+          <button class="btn" data-page="focus">开始专注</button></div>`}
+      </div>
+    </div>
+    <div class="col-side">
+      <div class="card">
+        <h2>备考进度 <span class="hint">${taskPct}%</span></h2>
+        <div class="prog"><i style="width:${taskPct}%"></i></div>
+        <div class="mini">按今天的任务完成度算</div>
+        <div style="margin-top:14px">
+          <div class="mini" style="margin:0">今日专注</div>
+          <div class="big-num">${hhmm(d.focus_seconds_today)}<small> / ${hhmm(d.focus_target_seconds)}</small></div>
+          <div class="prog"><i style="width:${pct}%"></i></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>近 7 天节奏 <span class="more" data-page="insight">查看记录 →</span></h2>
+        ${rhythm(false)}
+      </div>
+    </div>
+  </div>`;
+}
+
+function taskList(limit) {
+  const list = limit ? S.dash.tasks.slice(0, 6) : S.dash.tasks;
+  if (!list.length) {
+    return `<div class="empty">今天还没有安排任务。
+      <span style="color:var(--blue);cursor:pointer" data-page="plan">去加一条 →</span></div>`;
+  }
+  const PRI = { 1: "重要", 2: "一般", 3: "次要" };
+  return list.map(t => `
+    <div class="task ${t.status === "done" ? "done" : ""}">
+      <span class="box" data-task="${t.id}" data-status="${t.status}">✓</span>
+      <span class="name">${esc(t.title)}</span>
+      ${t.subject ? `<span class="meta">${esc(t.subject)}</span>` : ""}
+      <span class="pri p${t.priority}">${PRI[t.priority] || "一般"}</span>
+      <span class="meta">${t.minutes} 分钟</span>
+    </div>`).join("");
+}
+
+function rhythm(tall) {
+  const rows = S.dash.focus_7d;
+  const max = Math.max(1, ...rows.map(r => r.seconds));
+  const cap = tall ? 80 : 58;
+  return `<div class="rhythm" style="height:${tall ? 96 : 64}px">
+    ${rows.map(r => {
+      const h = Math.round(r.seconds / max * cap);
+      const day = new Date(r.date + "T00:00:00").getDay();
+      return `<div class="col" title="${r.date} 专注 ${hhmm(r.seconds)}">
+        <span class="bar ${h ? "" : "zero"}" style="height:${Math.max(3, h)}px"></span>
+        <span class="d">${tall ? r.date.slice(5) : WEEK[day]}</span></div>`;
+    }).join("")}</div>
+    <div class="mini">最近 7 天累计 ${hhmm(rows.reduce((a, r) => a + r.seconds, 0))}</div>`;
+}
+
+/* ===================== 安排计划 ===================== */
+function viewPlan() {
+  return `<div class="cols"><div class="col-main">
+    <div class="card">
+      <h2>加一条任务</h2>
+      <div class="row">
+        <input type="text" id="t-title" placeholder="要做什么？例如 二叉树遍历 20 题"
+               style="flex:1;min-width:220px">
+        <input type="text" id="t-subject" placeholder="科目" style="width:100px">
+        <input type="number" id="t-minutes" value="30" min="5" step="5" style="width:76px">
+        <span class="mini" style="margin:0">分钟</span>
+        <select id="t-priority">
+          <option value="1">重要</option><option value="2" selected>一般</option>
+          <option value="3">次要</option>
+        </select>
+        <button class="btn primary" id="add-task">加上</button>
+      </div>
+      <div class="mini">任务和卡片不一样：卡片是"要记住的知识点"，任务是"要完成的事"。</div>
+    </div>
+    <div class="card">
+      <h2>今天的安排 <span class="hint">${S.dash.tasks_done}/${S.dash.tasks_total} 已完成</span></h2>
+      ${taskList(false)}
+    </div>
+  </div></div>`;
+}
+/* ===================== 开始专注 ===================== */
+function viewFocus() {
+  const t = S.timer;
+  return `<div class="cols">
+    <div class="col-main">
+      <div class="card">
+        <div class="timerwrap">
+          ${hourglass()}
+          <div class="timerbox">
+            <div class="lbl">本轮专注</div>
+            <div class="big" id="clock">${mmss(t.remain)}</div>
+            <div class="acting" id="acting">${t.running ? "沙粒正在落下…" : "选好时长，按开始"}</div>
+            <div class="timerbtns">
+              <button class="btn primary" id="toggle">${t.running ? "暂停" : "开始"}</button>
+              <button class="btn" id="reset">重置</button>
+            </div>
+            <div class="presets">
+              ${[25, 50, 90].map(m => `<button data-preset="${m}"
+                class="${t.total === m * 60 ? "on" : ""}">${m} 分钟</button>`).join("")}
+            </div>
+          </div>
+        </div>
+        <div class="mini" style="margin-top:16px">
+          暂停或重置时，已经专注的时间会自动记下来 —— 中途被打断也算数，
+          因为"今天到底专注了多久"才是洞察要用的数。
+        </div>
+      </div>
+    </div>
+    <div class="col-side">
+      <div class="card">
+        <h2>这轮专注做什么</h2>
+        <select id="focus-task" style="width:100%">
+          <option value="">（不绑定任务）</option>
+          ${S.dash.tasks.filter(x => x.status !== "done").map(x =>
+            `<option value="${x.id}" ${String(x.id) === String(t.taskId) ? "selected" : ""}>
+              ${esc(x.title)}</option>`).join("")}
+        </select>
+        <div class="mini">绑定之后，学习洞察里能看出"时间花在哪儿了"。</div>
+      </div>
+      <div class="card">
+        <h2>今日已专注</h2>
+        <div class="big-num">${hhmm(S.dash.focus_seconds_today)}
+          <small> / ${hhmm(S.dash.focus_target_seconds)}</small></div>
+        ${rhythm(false)}
+      </div>
+    </div>
+  </div>`;
+}
+
+function hourglass() {
+  const p = S.timer.total ? 1 - S.timer.remain / S.timer.total : 0;
+  const topY = 22 + p * 57;
+  const botH = p * 57;
+  return `<svg class="glass" viewBox="0 0 120 160">
+    <defs>
+      <clipPath id="ct"><polygon points="22,22 98,22 60,78"/></clipPath>
+      <clipPath id="cb"><polygon points="60,82 98,138 22,138"/></clipPath>
+      <linearGradient id="gs" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#5fe3a6"/><stop offset="1" stop-color="#1f7a52"/>
+      </linearGradient>
+    </defs>
+    <rect id="sandTop" x="0" y="${topY}" width="120" height="${Math.max(0, 78 - topY)}"
+          fill="url(#gs)" clip-path="url(#ct)"/>
+    <rect id="sandBot" x="0" y="${138 - botH}" width="120" height="${botH}"
+          fill="url(#gs)" clip-path="url(#cb)"/>
+    <polygon class="glass-frame" points="22,22 98,22 60,78"/>
+    <polygon class="glass-frame" points="60,82 98,138 22,138"/>
+    <line class="glass-frame" x1="60" y1="78" x2="60" y2="82"/>
+    <rect class="glass-cap" x="16" y="16" width="88" height="6" rx="3"/>
+    <rect class="glass-cap" x="16" y="138" width="88" height="6" rx="3"/>
+  </svg>`;
+}
+
+/* ===================== 错题复习 ===================== */
+function viewReview() {
+  const total = S.queue.length;
+  const pct = total ? Math.round(S.index / total * 100) : 100;
+  const shown = Math.min(S.index + (S.index < total ? 1 : 0), total);
+  let body;
+
+  if (!total) {
+    body = `<div class="empty">${S.dash.reviewed_today
+      ? `今天的 ${S.dash.reviewed_today} 张都过完了，休息一下吧。`
+      : "今天没有到期的卡片。"}</div>`;
+  } else {
+    const c = S.queue[S.index];
+    body = `<div class="tag">${esc(c.subject)} · ${esc(c.knowledge_point)}</div>
+      <div class="q">${esc(c.question)}</div>
+      <div class="mini">间隔 ${c.interval_days} 天 · EF ${c.ef} · 答错 ${c.lapses} 次</div>`;
+    if (!S.revealed) {
+      body += `<div class="row" style="margin-top:18px">
+        <button class="btn primary" id="reveal">显示答案</button>
+        <span class="mini" style="margin:0">先自己回忆一遍，再点这里（或按空格）</span></div>`;
+    } else {
+      body += `<div class="ans">${esc(c.answer)}</div>`;
+      if (c.source) body += `<div class="mini">来源：${esc(c.source)}</div>`;
+      body += `<div class="mini" style="margin-top:16px">这次答得怎么样？</div>
+        <div class="ratings">
+          ${[5, 4, 3, 2, 1, 0].map(n => `<button
+            class="${n >= 3 ? "good" : n >= 1 ? "bad" : "zero"}" data-rate="${n}">
+            <span class="n">${n}</span><span class="l">${RATE_LABELS[n]}</span></button>`).join("")}
+        </div>
+        <div class="mini">${S.stagedMode
+          ? "逐步确认已打开：打分先进暂存区，确认后才生效。"
+          : "点分数立刻记录，也可以直接按数字键。"}</div>`;
+    }
+  }
+
+  return `<div class="cols">
+    <div class="col-main">
+      <div class="card">
+        <div class="line"><i style="width:${pct}%"></i></div>
+        <div class="mini" style="margin:0 0 14px">第 ${shown} / ${total} 张</div>
+        ${body}
+        ${S.toast ? `<div class="toast ${S.toast.bad ? "bad" : ""}">${S.toast.text}</div>` : ""}
+      </div>
+      ${explainPanel()}
+      ${stagedCard()}
+      <div class="card">
+        <label class="sw"><input type="checkbox" id="staged-mode"
+          ${S.stagedMode ? "checked" : ""}> 逐步确认模式（打分先进暂存区，我确认了才算）</label>
+        <div class="mini">默认是直接记录。打开它是为了防止手滑 ——
+          打错一次分，这张卡的间隔会被重置，接下来几天都白复习。</div>
+      </div>
+    </div>
+    <div class="col-side">
+      <div class="card">
+        <h2>复习队列</h2>
+        <div class="mini" style="margin:0">
+          ${total ? `还有 ${total - S.index} 张没做，共 ${S.dash.due_total} 张到期`
+                  : "队列是空的"}</div>
+        <div class="mini">排序规则：逾期最久的排最前，同一天按科目。</div>
+      </div>
+      <div class="card">
+        <h2>为什么是算法在排</h2>
+        <div class="mini" style="line-height:1.9">
+          SM-2 只用了三个变量：EF（难度）、间隔、连对次数。<br>
+          答对 → 间隔按 1 → 6 → 乘 EF 递增；答错 → 重置为 1 天。<br>
+          同样输入永远同样输出，所以它能被测试，也能被重放。
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* 「让 AI 讲一遍」。这是全项目**唯一**会调用大模型的地方。
+   注意它出现在"上一张卡"里，而不是当前这张 —— 因为模型要等你知道
+   自己答错了才有意义，而且不能打断刷题节奏。 */
+function explainPanel() {
+  if (!S.prev) return "";
+  const { card, rating } = S.prev;
+  const e = S.explain;
+  let body;
+
+  if (e && e.loading) {
+    body = `<div class="mini" style="margin:0">正在问模型…（第一次可能要几秒）</div>`;
+  } else if (e) {
+    body = `<div class="ans" style="border-left-color:${e.ok ? "var(--purple)" : "var(--yellow)"}"
+      >${esc(e.text)}</div>`
+      + (e.ok
+        ? `<div class="mini">来自 ${esc(e.model || "模型")} · 只讲了这道题涉及的知识点</div>`
+        : "");
+  } else if (rating < 3) {
+    body = `<div class="row">
+        <button class="btn" id="explain">让 AI 讲一遍</button>
+        <span class="mini" style="margin:0">${S.dash.llm_ready
+          ? "只有答错的题才值得讲 —— 这个判断是算法做的，不是模型"
+          : "还没配置 API key"}</span>
+      </div>
+      ${S.dash.llm_ready ? "" : `<div class="mini">
+        在项目根目录建一个 <b>.env</b>，写上 <b>DEEPSEEK_API_KEY=你的密钥</b>，重启应用就能用。
+        这个文件已经在 .gitignore 里，不会被提交。</div>`}`;
+  } else {
+    body = `<div class="mini" style="margin:0">这题答对了，不用讲。答错的时候再看。</div>`;
+  }
+
+  return `<div class="card">
+    <h2>上一张 <span class="hint">${esc(card.knowledge_point)}</span></h2>
+    ${body}
+  </div>`;
+}
+
+function stagedCard() {
+  if (!S.staged.length) return "";
+  return `<div class="card">
+    <h2>暂存区 <span class="hint">${S.staged.length} 条待确认</span></h2>
+    <div class="mini" style="margin:0 0 6px">
+      这些打分还没写进记忆状态。确认才生效，丢掉就当作没打过。</div>
+    ${S.staged.map(s => `<div class="task">
+      <span class="pri p2">${s.rating} 分</span>
+      <span class="name">${esc(s.question)}</span>
+      <button class="btn tiny" data-confirm="${s.id}">确认</button>
+      <button class="btn tiny danger" data-drop="${s.id}">丢掉</button>
+    </div>`).join("")}</div>`;
+}
+/* ===================== 学习洞察 ===================== */
+function budgetBars() {
+  const max = Math.max(1, ...S.forecast.map(d => d.count));
+  return `<div class="rhythm" style="height:96px">
+    ${S.forecast.map(d => {
+      const h = Math.round(d.count / max * 78);
+      return `<div class="col" title="${d.date} ${d.count} 张">
+        <span class="bar ${h ? "blue" : "zero"}" style="height:${Math.max(3, h)}px"></span>
+        <span class="d">${d.date.slice(5)}</span></div>`;
+    }).join("")}</div>
+    <div class="mini">共 ${S.forecast.reduce((a, d) => a + d.count, 0)} 张到期。
+      这就是"我接下来几天会不会爆掉"的答案。</div>`;
+}
+
+function viewInsight() {
+  return `<div class="cols">
+    <div class="col-main">
+      <div class="card">
+        <h2>专注节奏 <span class="hint">近 7 天</span></h2>
+        ${rhythm(true)}
+      </div>
+      <div class="card">
+        <h2>各科统计</h2>
+        <table>
+          <tr><th>科目</th><th>卡片</th><th>今天到期</th><th>平均间隔</th>
+              <th>掌握度</th><th>累计答错</th></tr>
+          ${S.stats.subjects.map(r => `<tr>
+            <td>${esc(r.subject)}</td><td>${r.total}</td><td>${r.due_now}</td>
+            <td>${r.avg_interval.toFixed(1)}</td><td>${r.mastery.toFixed(2)}</td>
+            <td>${r.lapses}</td></tr>`).join("")}
+        </table>
+        <div class="mini">掌握度 = 1 / (1 + 平均间隔)。间隔越长说明记得越牢，越接近 1。</div>
+      </div>
+      <div class="card">
+        <h2>薄弱知识点</h2>
+        ${S.stats.weak.length ? `<table>
+          <tr><th>知识点</th><th>复习次数</th><th>答错次数</th></tr>
+          ${S.stats.weak.map(w => `<tr><td>${esc(w.knowledge_point)}</td>
+            <td>${w.reviews}</td><td>${w.wrongs}</td></tr>`).join("")}</table>`
+        : `<div class="mini">还没有复习记录，看不出薄弱点。</div>`}
+      </div>
+    </div>
+    <div class="col-side">
+      <div class="card">
+        <h2>未来 7 天负载</h2>
+        ${budgetBars()}
+      </div>
+      <div class="card">
+        <h2>这些数从哪来</h2>
+        <div class="mini" style="line-height:1.9">
+          全部是 SQL 直接算的，没有一次大模型调用。<br>
+          复习调度来自 SM-2，专注时长来自 focus_sessions 表。<br>
+          模型负责"把话说清楚"，不负责"算数"。
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ===================== 设置与数据 ===================== */
+function viewSettings() {
+  const p = S.dash.profile;
+  return `<div class="cols"><div class="col-main">
+    <div class="card">
+      <h2>个人画像</h2>
+      ${Object.entries(p).map(([k, v]) => `<div class="task">
+        <span class="meta" style="width:128px">${esc(k)}</span>
+        <span class="name">${esc(v)}</span>
+        ${k === "daily_minutes" ? `
+          <input type="number" id="daily" value="${esc(v)}" min="5" step="5" style="width:82px">
+          <button class="btn tiny" id="save-daily">保存</button>` : ""}
+      </div>`).join("")}
+      <div class="mini">
+        ${S.dash.focus_target_seconds ? `由「每天 ${esc(p.daily_minutes || "?")} 分钟」推出：
+          今天最多复习 ${S.dash.due_now} 张、专注目标 ${hhmm(S.dash.focus_target_seconds)}。` : ""}
+        画像字段有限且确定，所以直接查表，不走向量检索 —— 快，而且不会因为相似度差一点就漏掉。
+      </div>
+    </div>
+    <div class="card">
+      <h2>数据库</h2>
+      <div class="mini" style="margin:0;line-height:1.9">
+        卡片 ${S.dash.total_cards} 张 · 今日到期 ${S.dash.due_total} 张 ·
+        逾期 ${S.dash.overdue} 张 · 掌握度 ${(S.dash.mastery * 100).toFixed(0)}%<br>
+        备份就是复制 data/study.db 这一个文件。
+      </div>
+    </div>
+  </div></div>`;
+}
+
+/* ===================== 渲染 ===================== */
+const VIEWS = { today: viewToday, plan: viewPlan, focus: viewFocus,
+                review: viewReview, insight: viewInsight, settings: viewSettings };
+
+function render() {
+  renderShell();
+  $("#view").innerHTML = VIEWS[S.page]();
+}
+
+/* ===================== 交互 ===================== */
+document.addEventListener("click", async (e) => {
+  const nav = e.target.closest("[data-page]");
+  if (nav) { S.page = nav.dataset.page; S.toast = null; render(); return; }
+  if (e.target.closest("#quit")) { await quit(); return; }
+  if (e.target.closest("#theme")) { toggleTheme(); return; }
+  if (S.busy) return;
+
+  const el = e.target.closest("[data-rate],[data-confirm],[data-drop],[data-task]," +
+    "#reveal,#add-task,#save-daily,#toggle,#reset,[data-preset],#explain");
+  if (!el) return;
+
+  if (el.id === "reveal") { S.revealed = true; render(); return; }
+  if (el.id === "explain") return loadExplain();
+  if (el.id === "add-task") return addTask();
+  if (el.id === "save-daily") return saveDaily();
+  if (el.id === "toggle") return toggleTimer();
+  if (el.id === "reset") return resetTimer(true);
+  if (el.dataset.preset) return setPreset(+el.dataset.preset);
+  if (el.dataset.rate !== undefined) return rate(+el.dataset.rate);
+  if (el.dataset.task) return toggleTask(el.dataset.task, el.dataset.status);
+  if (el.dataset.confirm) return confirmStaged(+el.dataset.confirm);
+  if (el.dataset.drop) return dropStaged(+el.dataset.drop);
+});
+
+document.addEventListener("change", (e) => {
+  if (e.target.id === "staged-mode") { S.stagedMode = e.target.checked; render(); }
+  if (e.target.id === "focus-task") S.timer.taskId = e.target.value || null;
+});
+
+document.addEventListener("keydown", (e) => {
+  if (["INPUT", "SELECT", "TEXTAREA"].includes(e.target.tagName)) return;
+  if (S.page !== "review") return;
+  if (e.code === "Space" && !S.revealed && S.queue[S.index]) {
+    e.preventDefault(); S.revealed = true; render(); return;
+  }
+  if (S.revealed && /^[0-5]$/.test(e.key)) rate(+e.key);
+});
+
+async function quit() {
+  // 点下去立刻切成"正在退出"，别让人对着一个没反应的按钮发呆
+  $("#offline-title").textContent = "正在退出…";
+  $("#offline-msg").textContent = "后台服务正在停止，稍等一下。";
+  $("#offline").hidden = false;
+  const reconnect = $("#offline-reconnect");
+  if (reconnect) reconnect.hidden = true;   // 都退出了，还"重新连接"什么
+
+  // 这里故意不走通用的 api()：它一失败就会弹"连不上后台服务"。
+  // 可是"服务停下来"正是这次操作要的结果 —— 那个提示在这儿是对的报错、错的位置。
+  try {
+    await fetch("/api/shutdown", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+  } catch (err) { /* 服务已经关了，本来就会这样 */ }
+
+  $("#offline-title").textContent = "应用已关闭";
+  $("#offline-msg").textContent =
+    "后台服务已经停下来了，窗口马上会自己关掉。\n"
+    + "下次想用，双击桌面上的「备考助手」。";
+}
+
+/* ---------------- 主题 ---------------- */
+/* 颜色全写在 CSS 变量里，所以切主题只是给 <html> 加一个 class，
+   不需要重新渲染页面，也不需要重新算任何数据。 */
+const THEME_KEY = "study-coach:theme";
+
+function applyTheme(mode) {
+  const dark = mode === "dark";
+  document.documentElement.classList.toggle("dark", dark);
+  const btn = document.querySelector("#theme");
+  if (btn) btn.innerHTML = `<span class="dot"></span>${dark ? "浅色主题" : "深色主题"}`;
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", dark ? "#0b0f14" : "#f4f6f8");
+}
+
+function toggleTheme() {
+  const dark = !document.documentElement.classList.contains("dark");
+  try { localStorage.setItem(THEME_KEY, dark ? "dark" : "light"); } catch (err) { /* 无痕模式 */ }
+  applyTheme(dark ? "dark" : "light");
+}
+
+// 默认浅色；只有你自己切过深色，下次才记住
+try { applyTheme(localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light"); }
+catch (err) { applyTheme("light"); }
+
+/* 关于全屏：这里**故意不提供**"全屏 / 退出全屏"按钮。
+
+   踩过的坑：全屏有两种，谁在管完全不一样 ——
+
+     1. 页面申请的全屏（Fullscreen API）：document.fullscreenElement 有值，
+        Esc 或 exitFullscreen() 都能退，页面说了算。
+     2. 浏览器自己的全屏（--start-fullscreen / F11）：fullscreenElement 是 null，
+        **页面根本没有权限退出它**，只能按 F11。
+
+   而这两种状态在界面上长得一模一样，用户没法区分，按钮的标签也会骗人 ——
+   我们就是因为这个让人卡在全屏里出不来。
+
+   所以界面上不再放这个按钮：窗口默认已经最大化（铺满屏幕、只留任务栏），
+   真要全屏就按 F11 —— 那是浏览器自己的开关，按一下进、再按一下出，永远对称。
+   下面这个提示负责在"浏览器全屏"时告诉用户出口在哪。 */
+function syncFullscreenLabel() {
+  const inPage = !!document.fullscreenElement;
+  // 窗口铺满整个屏幕、但页面自己没拿到全屏状态 —— 说明是浏览器在做主
+  const browserFull = !inPage
+    && window.outerWidth >= screen.width - 4
+    && window.outerHeight >= screen.height - 4;
+  const hint = document.querySelector("#fs-hint");
+  if (hint) hint.classList.toggle("show", browserFull);
+}
+document.addEventListener("fullscreenchange", syncFullscreenLabel);
+window.addEventListener("resize", syncFullscreenLabel);
+
+async function addTask() {
+  const title = $("#t-title").value.trim();
+  if (!title) { toast("先写点什么要做的事。", true); render(); return; }
+  S.busy = true;
+  await post("/api/task/add", {
+    title,
+    subject: $("#t-subject").value.trim(),
+    minutes: +$("#t-minutes").value || 30,
+    priority: +$("#t-priority").value,
+  });
+  await refresh();
+  S.busy = false;
+}
+
+async function toggleTask(taskId, status) {
+  S.busy = true;
+  await post("/api/task/status", {
+    task_id: +taskId, status: status === "done" ? "todo" : "done",
+  });
+  await refresh();
+  S.busy = false;
+}
+
+async function saveDaily() {
+  const v = $("#daily").value.trim();
+  if (!/^\d+(\.\d+)?$/.test(v) || +v <= 0) {
+    toast("每天可用分钟数要填一个正数。", true); render(); return;
+  }
+  S.busy = true;
+  await post("/api/profile", { key: "daily_minutes", value: v });
+  await refresh();
+  S.busy = false;
+}
+
+async function rate(rating) {
+  const c = S.queue[S.index];
+  if (!c) return;
+  S.busy = true;
+  try {
+    if (S.stagedMode) {
+      await post("/api/stage", { card_id: c.id, rating });
+      toast(`已把「${rating} 分」放进暂存区，到下面确认或丢掉。`);
+    } else {
+      const r = await post("/api/review", { card_id: c.id, rating });
+      S.done++;
+      if (rating >= 3) S.right++;
+      toast(rating >= 3
+        ? `✓ 间隔 ${r.before.interval_days} 天 → ${r.after.interval_days} 天，${r.note}。`
+        : `✗ 答错，间隔重置为 ${r.after.interval_days} 天，这张卡会重新来过。`, rating < 3);
+    }
+    // 记下刚打分的这张 —— 答错之后「让 AI 讲一遍」讲的是它
+    S.prev = { card: c, rating };
+    S.explain = null;
+    S.index++; S.revealed = false;
+    await refresh();
+  } catch (err) { toast(err.message, true); render(); }
+  S.busy = false;
+}
+
+async function loadExplain() {
+  const p = S.prev;
+  if (!p) return;
+  S.explain = { loading: true, ok: false, text: "" };
+  render();
+  try {
+    const r = await post("/api/explain", { card_id: p.card.id, rating: p.rating });
+    S.explain = { loading: false, ok: r.ok, text: r.text, model: r.model };
+  } catch (err) {
+    S.explain = { loading: false, ok: false, text: "出错了：" + err.message };
+  }
+  render();
+}
+
+async function confirmStaged(id) {
+  S.busy = true;
+  try {
+    const r = await post("/api/confirm", { staging_id: id });
+    toast(`已确认：间隔 ${r.before.interval_days} 天 → ${r.after.interval_days} 天，下次 ${r.next_due}。`);
+    await refresh();
+  } catch (err) { toast(err.message, true); render(); }
+  S.busy = false;
+}
+
+async function dropStaged(id) {
+  S.busy = true;
+  try {
+    await post("/api/drop", { staging_id: id });
+    toast("已丢掉这条暂存，记忆状态原封不动。");
+    await refresh();
+  } catch (err) { toast(err.message, true); render(); }
+  S.busy = false;
+}
+
+/* ===================== 计时器 ===================== */
+function setPreset(minutes) {
+  if (S.timer.running) return;
+  S.timer.total = minutes * 60;
+  S.timer.remain = minutes * 60;
+  render();
+}
+
+function toggleTimer() {
+  const t = S.timer;
+  if (t.running) { stopTicking(); t.running = false; render(); return; }
+  t.running = true;
+  t.tick = setInterval(() => {
+    t.remain -= 1;
+    if (t.remain <= 0) {
+      t.remain = 0;
+      stopTicking();
+      t.running = false;
+      beep();
+      logFocus(true);
+      toast("这一轮跑完了，起来活动一下。");
+      render();
+      return;
+    }
+    tickUI();
+  }, 1000);
+  render();
+}
+
+function stopTicking() {
+  if (S.timer.tick) { clearInterval(S.timer.tick); S.timer.tick = null; }
+}
+
+/** 只更新时钟和沙漏，不重建整棵 DOM —— 每秒重建会闪，输入框也会失焦。 */
+function tickUI() {
+  const t = S.timer;
+  const clock = $("#clock");
+  if (!clock) return;
+  clock.textContent = mmss(t.remain);
+  const p = t.total ? 1 - t.remain / t.total : 0;
+  const topY = 22 + p * 57;
+  const top = $("#sandTop"), bot = $("#sandBot");
+  if (top) { top.setAttribute("y", topY); top.setAttribute("height", Math.max(0, 78 - topY)); }
+  if (bot) { bot.setAttribute("y", 138 - p * 57); bot.setAttribute("height", p * 57); }
+}
+
+async function resetTimer(log) {
+  const t = S.timer;
+  const elapsed = t.total - t.remain;
+  stopTicking();
+  t.running = false;
+  t.remain = t.total;
+  if (log && elapsed >= 30) await logFocus(false, elapsed);
+  render();
+}
+
+async function logFocus(finished, elapsedOverride) {
+  const t = S.timer;
+  const elapsed = elapsedOverride ?? (t.total - t.remain);
+  if (elapsed < 5) return;
+  try {
+    await post("/api/focus/log", {
+      planned_min: Math.round(t.total / 60),
+      actual_sec: Math.round(elapsed),
+      finished,
+      task_id: t.taskId ? +t.taskId : null,
+    });
+    await refresh();
+  } catch (err) { /* 记录失败不该打断计时 */ }
+}
+
+/** 时间到响一声。用 Web Audio 现场合成三个音，不依赖任何音频文件。 */
+function beep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.22, 0.44].forEach((delay, i) => {
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = i === 2 ? 1046 : 784;
+      osc.connect(gain); gain.connect(ctx.destination);
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(0.22, ctx.currentTime + delay + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + delay + 0.18);
+      osc.start(ctx.currentTime + delay);
+      osc.stop(ctx.currentTime + delay + 0.2);
+    });
+  } catch (err) { /* 没有音频权限就算了，别打断计时 */ }
+}
+
+/* ===================== 启动 ===================== */
+syncFullscreenLabel();     // 一进来就把"全屏由谁控制"判断一次
+refresh().catch(err => {
+  $("#page-sub").textContent = "连不上后台服务";
+  showOffline("连不上后台服务。" + (err && err.message ? "（" + err.message + "）" : ""));
+});
+</script>
+</body>
+</html>

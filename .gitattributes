@@ -1,0 +1,13 @@
+# 换行符统一策略。
+# 不写这个的话，Windows 上 git 默认会把 LF 转成 CRLF，
+# 结果是 clone 下来"什么都没改却显示所有文件都改了"。
+
+* text=auto eol=lf
+
+# 这两个必须保持 CRLF：cmd 脚本和 PowerShell 脚本在 Windows 上按行解析
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# 二进制文件，别当文本处理
+*.ico binary
+*.png binary

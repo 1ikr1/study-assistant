@@ -1,0 +1,18 @@
+[project]
+name = "study-coach"
+version = "0.1.0"
+description = "一个会算的备考教练：模型负责理解，算法负责调度"
+requires-python = ">=3.11"
+# Phase 1 刻意保持零依赖，只用到 Python 标准库。
+# 后续阶段会加入：fastapi / langgraph / sqlalchemy / sentence-transformers
+dependencies = []
+
+[project.scripts]
+study = "study_coach.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["study_coach*"]
