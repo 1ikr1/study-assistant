@@ -311,7 +311,7 @@ python -m study_assistant.web --plain-browser
 ```
 msedge.exe
   --app=http://127.0.0.1:8765/
-  --user-data-dir=%LOCALAPPDATA%\study-coach\browser-profile
+  --user-data-dir=%LOCALAPPDATA%\study-assistant\browser-profile
   --no-first-run --no-default-browser-check
   --start-maximized
 ```
@@ -342,7 +342,7 @@ msedge.exe
 顺带两个好处：任务栏图标不和你的个人 Edge 挤在一起，更像独立软件；
 关掉窗口那个进程就退出，不会留一堆后台。
 
-配置目录在 `%LOCALAPPDATA%\study-coach\browser-profile`，几十 MB。
+配置目录在 `%LOCALAPPDATA%\study-assistant\browser-profile`，几十 MB。
 不想要了直接删掉，下次会重建。
 
 ### 如果确实要用 `--fullscreen`
