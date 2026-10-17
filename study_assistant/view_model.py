@@ -1,6 +1,6 @@
 """界面要用的数据，统一在这里组装。
 
-为什么单独一个文件：study-coach 现在有三个壳——
+为什么单独一个文件：个人学习助手 现在有四个壳——
 
     cli.py      一条命令做一件事
     session.py  终端里跑菜单
@@ -19,8 +19,8 @@ from __future__ import annotations
 import sqlite3
 from datetime import date
 
-from study_coach import repo
-from study_coach.sm2 import SM2State, preview
+from study_assistant import repo
+from study_assistant.sm2 import SM2State, preview
 
 # 每张卡平均花多少分钟（回忆 + 看答案 + 判断）。
 # 用来把画像里的"每天多少分钟"换算成"今天最多几张"。

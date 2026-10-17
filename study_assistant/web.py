@@ -5,7 +5,7 @@
 **网页应用 = 一个能返 HTML 的服务器 + 一个浏览器。** 没有魔法。
 
 启动：
-    python -m study_coach.web
+    python -m study_assistant.web
 然后浏览器会自动打开 http://127.0.0.1:8765
 """
 
@@ -24,9 +24,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from study_coach import config, db, repo, seed
-from study_coach import view_model as vm
-from study_coach.llm import ChatClient
+from study_assistant import config, db, repo, seed
+from study_assistant import view_model as vm
+from study_assistant.llm import ChatClient
 
 try:  # 只有 Windows 才有，导入失败就算了
     import winreg
@@ -91,7 +91,7 @@ class StudyServer(ThreadingHTTPServer):
 # HTTP 处理
 # --------------------------------------------------------------------------
 class Handler(BaseHTTPRequestHandler):
-    server_version = "study-coach"
+    server_version = "study-assistant"
 
     # ---- 小工具：发 JSON / 发文件 -------------------------------------
     def _json(self, payload: dict, status: int = 200) -> None:
@@ -237,7 +237,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"ok": True, "session_id": session_id})
             elif path == "/api/explain":
                 # 延迟导入：coach 只在真正要用到模型的时候才需要
-                from study_coach import coach
+                from study_assistant import coach
 
                 profile = repo.get_profile(conn)
                 self._json(coach.explain_or_hint(
@@ -352,7 +352,7 @@ def app_profile_dir() -> Path:
       · 关掉窗口这个进程就退出，不会留一堆后台。
     """
     base = Path(os.environ.get("LOCALAPPDATA") or Path.home())
-    path = base / "study-coach" / "browser-profile"
+    path = base / "study-assistant" / "browser-profile"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -404,7 +404,7 @@ def open_window(
     return "普通浏览器标签页", None
 
 
-def close_app_window(pid: int | None, title_hint: str = "study-coach") -> int:
+def close_app_window(pid: int | None, title_hint: str = "个人学习助手") -> int:
     """把应用窗口关掉，返回关了几个。
 
     为什么需要这个：全屏是浏览器管的，网页里点不动它 ——
@@ -490,7 +490,7 @@ def serve(
     # pythonw.exe 启动时 sys.stdout 是 None，这些 print 会自动变成空操作
     print()
     print("─" * 64)
-    print("  study-coach 已经启动")
+    print("  个人学习助手 已经启动")
     print("─" * 64)
     print(f"  界面地址 : {url}")
     print(f"  数据库   : {httpd.db_path}")  # type: ignore[attr-defined]
@@ -536,7 +536,7 @@ def _fatal(message: str) -> None:
         try:
             import ctypes
 
-            ctypes.windll.user32.MessageBoxW(None, message, "study-coach 启动失败", 0x10)
+            ctypes.windll.user32.MessageBoxW(None, message, "个人学习助手 启动失败", 0x10)
         except Exception:
             pass
 
@@ -544,7 +544,7 @@ def _fatal(message: str) -> None:
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(prog="study-web", description="study-coach 网页界面")
+    parser = argparse.ArgumentParser(prog="study-web", description="个人学习助手 网页界面")
     parser.add_argument("--db", default=str(db.DEFAULT_DB))
     parser.add_argument("--port", type=int, default=0, help="不填就自动挑一个空闲端口")
     parser.add_argument("--no-browser", action="store_true", help="不自动打开浏览器")

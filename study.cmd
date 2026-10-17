@@ -11,6 +11,6 @@ if exist "%LOCALAPPDATA%\Programs\Python\Python313\pythonw.exe" set PYEXEW=%LOCA
 rem No arguments = double-clicked = start the web UI in the background and open
 rem the browser. pythonw.exe has no console, so no black window ever appears;
 rem "start" lets this script exit immediately instead of staying alive.
-if "%~1"=="" start "" "%PYEXEW%" -m study_coach.web
+if "%~1"=="" start "" "%PYEXEW%" -m study_assistant.web
 rem With arguments = used from a terminal = run that one subcommand and exit.
-if not "%~1"=="" "%PYEXE%" -m study_coach.cli %*
+if not "%~1"=="" "%PYEXE%" -m study_assistant.cli %*

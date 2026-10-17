@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import unittest
 
-from study_coach.sm2 import EF_INIT, EF_MIN, SM2State, ef_delta, preview, update
+from study_assistant.sm2 import EF_INIT, EF_MIN, SM2State, ef_delta, preview, update
 
 
 class TestIntervals(unittest.TestCase):

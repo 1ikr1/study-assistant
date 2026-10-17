@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>study-coach · 备考工作台</title>
+<title>个人学习助手</title>
 <meta name="theme-color" content="#f4f6f8">
 <!-- 图标和应用图标是同一套：圆角方块 + 祖母绿渐变 + 白色沙漏。
      这里用 SVG 内联，任何缩放下都锐利；icon.ico 是同一张图的位图版本。 -->
@@ -276,7 +276,7 @@
 </head>
 <body>
 <aside>
-  <div class="brand"><span class="logo">✦</span><b>study-coach</b></div>
+  <div class="brand"><span class="logo">✦</span><b>个人学习助手</b></div>
   <div class="countdown" id="countdown"></div>
   <div class="navgroup" id="nav-main"></div>
   <div class="navgroup" id="nav-extra"></div>
@@ -875,7 +875,7 @@ async function quit() {
 /* ---------------- 主题 ---------------- */
 /* 颜色全写在 CSS 变量里，所以切主题只是给 <html> 加一个 class，
    不需要重新渲染页面，也不需要重新算任何数据。 */
-const THEME_KEY = "study-coach:theme";
+const THEME_KEY = "study-assistant:theme";
 
 function applyTheme(mode) {
   const dark = mode === "dark";

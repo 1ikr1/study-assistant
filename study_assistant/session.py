@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import sqlite3
 
-from study_coach import db, repo
-from study_coach.cli import DEFAULT_MINUTES_PER_CARD, card_limit_from_profile, hr
-from study_coach.sm2 import SM2State, preview
+from study_assistant import db, repo
+from study_assistant.cli import DEFAULT_MINUTES_PER_CARD, card_limit_from_profile, hr
+from study_assistant.sm2 import SM2State, preview
 
 RATING_HELP = """\
      5 完美满分      4 答对了但犹豫      3 答对了但很吃力
@@ -218,7 +218,7 @@ def main_menu(conn: sqlite3.Connection) -> None:
     while True:
         _say()
         hr("═")
-        _say("   study-coach · 备考助手")
+        _say("   个人学习助手")
         hr("═")
         _show_due_brief(conn)
         _say()

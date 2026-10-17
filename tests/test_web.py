@@ -19,7 +19,7 @@ import urllib.request
 from pathlib import Path
 from unittest import mock
 
-from study_coach import db, seed, web
+from study_assistant import db, seed, web
 
 _TMP_ROOT = Path(__file__).resolve().parent.parent / ".tmp-tests"
 _TMP_ROOT.mkdir(parents=True, exist_ok=True)
@@ -85,7 +85,7 @@ class WebTestCase(unittest.TestCase):
             self.assertEqual(res.status, 200)
             self.assertIn("text/html", res.headers["Content-Type"])
             body = res.read().decode("utf-8")
-        self.assertIn("study-coach", body)
+        self.assertIn("个人学习助手", body)
         # 工作台骨架：侧边栏 + 五个页面里的几个关键词
         for word in ("今日行动", "开始专注", "错题复习", "学习洞察", "countdown"):
             self.assertIn(word, body, f"页面里应该有「{word}」")
@@ -133,7 +133,7 @@ class WebTestCase(unittest.TestCase):
     def test_explain_endpoint_never_touches_the_network(self):
         """整条链路走通，但 ChatClient 的传输层是假的 ——
         跑测试不该烧 token，也不该依赖有没有网。"""
-        from study_coach.llm import ChatClient
+        from study_assistant.llm import ChatClient
 
         def transport(url, headers, body, timeout):
             return 200, json.dumps(
@@ -151,7 +151,7 @@ class WebTestCase(unittest.TestCase):
 
     def test_explain_endpoint_says_no_thanks_when_you_got_it_right(self):
         """答对了就不该发请求 —— 构造客户端本身不花钱，发出去才花钱。"""
-        from study_coach.llm import ChatClient
+        from study_assistant.llm import ChatClient
 
         sent: list[str] = []
 

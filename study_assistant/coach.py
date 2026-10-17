@@ -15,8 +15,8 @@ from __future__ import annotations
 import sqlite3
 from dataclasses import dataclass
 
-from study_coach import repo
-from study_coach.llm import ChatClient, LLMError, Message
+from study_assistant import repo
+from study_assistant.llm import ChatClient, LLMError, Message
 
 # 评分对应的说法。注意这里的措辞是给模型看的，
 # 和界面上按钮的短标签（"完美""很吃力"）故意不一样 ——

@@ -92,7 +92,7 @@ def write_env_template(path: Path | None = None) -> Path:
     target = path or DEFAULT_ENV_PATH
     if not target.exists():
         target.write_text(
-            "# study-coach 的配置。这个文件不会被提交（.gitignore 里排除了）。\n"
+            "# 个人学习助手 的配置。这个文件不会被提交（.gitignore 里排除了）。\n"
             "#\n"
             "# 去 https://platform.deepseek.com 申请一个 key，粘在等号后面。\n"
             "# 留空也能用 —— 只是「让 AI 讲一遍」那个功能会提示你先配置。\n"

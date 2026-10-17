@@ -4,18 +4,18 @@ Phase 1 的"成品"就是这个 CLI —— 它已经是一个能用的备考工�
 只是还没有大模型和界面。
 
 用法：
-    python -m study_coach.cli menu          打开交互式菜单（双击启动用这条）
-    python -m study_coach.cli init          建库并导入示例卡片
-    python -m study_coach.cli due           今天该复习什么
-    python -m study_coach.cli answer 3      看第 3 张的答案
-    python -m study_coach.cli review 3 4    给第 3 张打 4 分
-    python -m study_coach.cli preview 3     看这张卡未来的复习间隔
-    python -m study_coach.cli stage 3 4     先暂存打分（不落库），等人确认
-    python -m study_coach.cli staged        看暂存区里有什么
-    python -m study_coach.cli confirm 1     确认第 1 条暂存，真正生效
-    python -m study_coach.cli stats         各科统计
-    python -m study_coach.cli forecast      未来 7 天负载
-    python -m study_coach.cli profile       查看画像
+    python -m study_assistant.cli menu          打开交互式菜单（双击启动用这条）
+    python -m study_assistant.cli init          建库并导入示例卡片
+    python -m study_assistant.cli due           今天该复习什么
+    python -m study_assistant.cli answer 3      看第 3 张的答案
+    python -m study_assistant.cli review 3 4    给第 3 张打 4 分
+    python -m study_assistant.cli preview 3     看这张卡未来的复习间隔
+    python -m study_assistant.cli stage 3 4     先暂存打分（不落库），等人确认
+    python -m study_assistant.cli staged        看暂存区里有什么
+    python -m study_assistant.cli confirm 1     确认第 1 条暂存，真正生效
+    python -m study_assistant.cli stats         各科统计
+    python -m study_assistant.cli forecast      未来 7 天负载
+    python -m study_assistant.cli profile       查看画像
 """
 
 from __future__ import annotations
@@ -24,8 +24,8 @@ import argparse
 import sqlite3
 import sys
 
-from study_coach import config, db, repo, seed
-from study_coach.sm2 import SM2State, preview
+from study_assistant import config, db, repo, seed
+from study_assistant.sm2 import SM2State, preview
 
 # Windows 终端默认可能是 GBK，强制 UTF-8 避免中文报错
 if hasattr(sys.stdout, "reconfigure"):
@@ -78,7 +78,7 @@ def cmd_init(args) -> None:
         print("        这个文件不会被提交（.gitignore 里排除了）。")
     print()
     print("下一步：")
-    print("  python -m study_coach.cli due      # 看看今天该复习什么")
+    print("  python -m study_assistant.cli due      # 看看今天该复习什么")
     conn.close()
 
 
@@ -123,7 +123,7 @@ def cmd_due(args) -> None:
         print()
 
     print("给某张打分的命令：")
-    print("  python -m study_coach.cli review <序号> <评分0-5>")
+    print("  python -m study_assistant.cli review <序号> <评分0-5>")
     conn.close()
 
 
@@ -148,7 +148,7 @@ def cmd_answer(args) -> None:
     print(f"来源：{row['source'] or '（未标注）'}")
     hr()
     print("现在给自己打个分，然后记录：")
-    print(f"  python -m study_coach.cli review {args.index} <评分0-5>")
+    print(f"  python -m study_assistant.cli review {args.index} <评分0-5>")
     print()
     print("  5 完美   4 正确但犹豫   3 正确但吃力")
     print("  2 错了但想起来   1 错了但记得   0 完全不会")
@@ -248,9 +248,9 @@ def cmd_stage(args) -> None:
     print("  这张卡   : 仍然在今天的队列里——因为还没写进记忆状态")
     print()
     print("  确认后才真正生效：")
-    print(f"    python -m study_coach.cli confirm {staging_id}")
+    print(f"    python -m study_assistant.cli confirm {staging_id}")
     print("  觉得这次打分不算数，就丢掉它：")
-    print(f"    python -m study_coach.cli drop {staging_id}")
+    print(f"    python -m study_assistant.cli drop {staging_id}")
     conn.close()
 
 
@@ -311,14 +311,14 @@ def cmd_drop(args) -> None:
 def cmd_menu(args) -> None:
     # 延迟导入：session.py 需要复用本文件里的 hr / card_limit_from_profile，
     # 在模块顶层互相 import 会成环，所以放到函数里。
-    from study_coach import session
+    from study_assistant import session
 
     session.run(args.db)
 
 
 def cmd_web(args) -> None:
     """启动网页界面。web.py 里也不想反向 import cli，所以同样延迟导入。"""
-    from study_coach import web as web_module
+    from study_assistant import web as web_module
 
     web_module.serve(
         db_path=args.db,
@@ -330,7 +330,7 @@ def cmd_web(args) -> None:
 
 def cmd_desktop(args) -> None:
     """启动原生窗口界面（tkinter，零下载）。"""
-    from study_coach import desktop
+    from study_assistant import desktop
 
     desktop.run(args.db)
 
@@ -432,7 +432,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(
         prog="study",
-        description="study-coach —— 一个会算的备考教练",
+        description="个人学习助手 —— 模型负责理解，算法负责调度",
         epilog="每个子命令都支持 --db 指定数据库文件，例如：study due --db my.db",
     )
     sub = parser.add_subparsers(dest="command", required=True)

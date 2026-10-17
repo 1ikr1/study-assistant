@@ -1,4 +1,4 @@
-# study-coach 项目约定
+# 个人学习助手 · 项目约定
 
 这个文件是写给**在这个项目里干活的 AI**的。用户在 Codex 里新开一个对话、
 只要还在这个目录下，就会读到它 —— 所以跨对话的"记忆"靠的就是这里。
@@ -48,8 +48,8 @@ $env:PYTHONIOENCODING = "utf-8"
 $py = "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe"
 
 & $py -m unittest discover -s tests -v    # 跑全部测试
-& $py -m study_coach.web                  # 网页工作台（默认入口）
-& $py -m study_coach.desktop              # tkinter 版
+& $py -m study_assistant.web                  # 网页工作台（默认入口）
+& $py -m study_assistant.desktop              # tkinter 版
 .\study.cmd stats                         # 命令行版
 ```
 

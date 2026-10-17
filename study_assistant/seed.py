@@ -6,7 +6,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-from study_coach import repo
+from study_assistant import repo
 
 SAMPLE = Path(__file__).resolve().parent.parent / "data" / "cards_sample.json"
 

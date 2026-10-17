@@ -13,7 +13,7 @@ import unittest
 from datetime import date, timedelta
 from pathlib import Path
 
-from study_coach import db, repo, seed, view_model as vm
+from study_assistant import db, repo, seed, view_model as vm
 
 _TMP_ROOT = Path(__file__).resolve().parent.parent / ".tmp-tests"
 _TMP_ROOT.mkdir(parents=True, exist_ok=True)

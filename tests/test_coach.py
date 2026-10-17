@@ -14,8 +14,8 @@ import shutil
 import unittest
 from pathlib import Path
 
-from study_coach import coach, db, repo, seed
-from study_coach.llm import ChatClient, LLMNotConfigured
+from study_assistant import coach, db, repo, seed
+from study_assistant.llm import ChatClient, LLMNotConfigured
 
 _TMP_ROOT = Path(__file__).resolve().parent.parent / ".tmp-tests"
 _TMP_ROOT.mkdir(parents=True, exist_ok=True)

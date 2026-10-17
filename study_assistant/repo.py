@@ -9,7 +9,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import date, datetime, timedelta
 
-from study_coach.sm2 import SM2State, update
+from study_assistant.sm2 import SM2State, update
 
 
 def _now() -> str:

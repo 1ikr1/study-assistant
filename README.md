@@ -1,4 +1,4 @@
-# study-coach · 个人备考助手
+# 个人学习助手（study-assistant）
 
 > 一句话：**模型负责理解，算法负责调度。**
 > 「今天该复习什么」交给可复现的间隔重复算法，「怎么讲给我听」才留给大模型。
@@ -48,7 +48,7 @@
 | `interval_days` | 当前复习间隔（天） | 0 |
 | `repetitions` | 连续答对次数 | 0 |
 
-更新规则（`study_coach/sm2.py`）：
+更新规则（`study_assistant/sm2.py`）：
 
 ```
 评分 >= 3（算答对）：
@@ -150,8 +150,8 @@ algorithm         用的哪套算法（'sm2'）
 ## 四、目录结构
 
 ```
-study-coach/
-├── study_coach/
+study-assistant/
+├── study_assistant/
 │   ├── sm2.py        SM-2 算法内核（纯函数，不碰数据库）
 │   ├── db.py         建表 SQL + 连接
 │   ├── repo.py       数据访问层，所有 SQL 都收在这里
@@ -205,8 +205,8 @@ $py = "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe"
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 $env:PYTHONIOENCODING = "utf-8"
 
-& $py -m study_coach.cli init      # 建库 + 导入 20 张示例卡片
-& $py -m study_coach.cli due       # 今天该复习什么
+& $py -m study_assistant.cli init      # 建库 + 导入 20 张示例卡片
+& $py -m study_assistant.cli due       # 今天该复习什么
 ```
 
 ### 不想敲命令：双击图标
@@ -218,7 +218,7 @@ $env:PYTHONIOENCODING = "utf-8"
 
 ```
 ┌───────────────────────────────────────────────────────────────┐
-│  study-coach 备考助手      2026-10-16 · 到期 20 张 · 已复习 0 │
+│  个人学习助手      2026-10-16 · 到期 20 张 · 已复习 0 │
 ├───────────────────────────────────────────────────────────────┤
 │  复习  │  统计  │  负载  │  画像                             │
 ├───────────────────────────────────────────────────────────────┤
@@ -245,7 +245,7 @@ $env:PYTHONIOENCODING = "utf-8"
 | 快捷方式字段 | 值 |
 | --- | --- |
 | 目标 | `...\Python313\pythonw.exe` |
-| 参数 | `-m study_coach.web` |
+| 参数 | `-m study_assistant.web` |
 | 起始位置 | 项目目录（`-m` 要靠它找到包） |
 
 为什么要这样？因为 Windows 的 exe 文件头里有一个字段写着它属于哪种子系统：
@@ -289,14 +289,14 @@ subprocess.Popen([exe, f"--app={url}", "--window-size=1180,820"])
 `--app=` 是 Chromium 系浏览器（Edge / Chrome）自带的能力：**用独立窗口打开
 这个网址，但把它所有的浏览器痕迹都藏起来**。界面的 HTML 一个字都不用改。
 
-`study_coach/web.py` 里的 `find_app_browser()` 会先查注册表
+`study_assistant/web.py` 里的 `find_app_browser()` 会先查注册表
 （`App Paths\msedge.exe`）再翻常见安装目录，找得到就用应用模式，找不到就老实
 退回普通标签页 —— 所以换一台没装 Edge 的电脑也能用。
 
 想强制用普通标签页看一眼对比效果：
 
 ```powershell
-python -m study_coach.web --plain-browser
+python -m study_assistant.web --plain-browser
 ```
 
 **什么时候才真该上 Electron？** 当你需要这些的时候：开机自启、
@@ -348,7 +348,7 @@ msedge.exe
 ### 如果确实要用 `--fullscreen`
 
 ```powershell
-python -m study_coach.web --fullscreen
+python -m study_assistant.web --fullscreen
 ```
 
 这时窗口是全屏的，而且**页面退不出来**（原因见上面）。逃生口：
@@ -432,7 +432,7 @@ html.dark  { --bg:#0b0f14; --panel:#141a21; --fg:#e6edf3; ... }  /* 深色 */
 
 ```
 ════════════════════════════════════════════════════════════════════════
-   study-coach · 备考助手
+   个人学习助手
 ════════════════════════════════════════════════════════════════════════
   今天到期 8 张
 
@@ -452,7 +452,7 @@ html.dark  { --bg:#0b0f14; --panel:#141a21; --fg:#e6edf3; ... }  /* 深色 */
 
 ### 从终端调用
 
-`study.cmd` 也能接参数，效果和 `python -m study_coach.cli` 一样：
+`study.cmd` 也能接参数，效果和 `python -m study_assistant.cli` 一样：
 
 ```powershell
 .\study.cmd              # 启动网页工作台（双击桌面图标走的就是这条）
@@ -484,13 +484,13 @@ html.dark  { --bg:#0b0f14; --panel:#141a21; --fg:#e6edf3; ... }  /* 深色 */
 | `forecast --days 7` | 未来 N 天每天的复习负载 |
 | `profile` | 查看个人画像，以及由画像推出的今日题量 |
 
-上面这些都属于 `python -m study_coach.cli`。网页界面是单独一个模块：
+上面这些都属于 `python -m study_assistant.cli`。网页界面是单独一个模块：
 
 ```powershell
-python -m study_coach.web                # 启动界面并自动开浏览器
-python -m study_coach.web --port 9000    # 指定端口
-python -m study_coach.web --no-browser   # 只起服务，不弹浏览器
-python -m study_coach.desktop            # 原生窗口界面
+python -m study_assistant.web                # 启动界面并自动开浏览器
+python -m study_assistant.web --port 9000    # 指定端口
+python -m study_assistant.web --no-browser   # 只起服务，不弹浏览器
+python -m study_assistant.desktop            # 原生窗口界面
 ```
 
 ### 工作台有哪些页面

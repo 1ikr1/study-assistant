@@ -25,7 +25,7 @@ try:
 except Exception:  # pragma: no cover - 没装 tkinter 或者没有显示环境
     HAS_TK = False
 
-from study_coach import db, repo, seed
+from study_assistant import db, repo, seed
 
 _TMP_ROOT = Path(__file__).resolve().parent.parent / ".tmp-tests"
 _TMP_ROOT.mkdir(parents=True, exist_ok=True)
@@ -44,7 +44,7 @@ def _make_tmpdir() -> Path:
 @unittest.skipUnless(HAS_TK, "这台机器上没有可用的 tkinter")
 class DesktopTestCase(unittest.TestCase):
     def setUp(self) -> None:
-        from study_coach import desktop  # 延迟导入：tkinter 不能用时别在收集阶段就炸
+        from study_assistant import desktop  # 延迟导入：tkinter 不能用时别在收集阶段就炸
 
         self.desktop = desktop
         self._tmp = _make_tmpdir()
@@ -71,7 +71,7 @@ class DesktopTestCase(unittest.TestCase):
 
     # ---- 启动与切换 ---------------------------------------------------
     def test_window_opens_with_correct_title_and_state(self):
-        self.assertEqual(self.app.root.title(), "study-coach · 备考助手")
+        self.assertEqual(self.app.root.title(), "个人学习助手")
         self.assertEqual(self.app.state["due_total"], 20)
         self.assertEqual(self.app.state["limit"], 40)      # 60 分钟 / 1.5
         self.assertEqual(len(self.app.queue), 20)
@@ -214,7 +214,7 @@ class DesktopTestCase(unittest.TestCase):
     # ---- 和别的壳保持一致 ---------------------------------------------
     def test_desktop_and_web_report_the_same_numbers(self):
         """四个壳共用 view_model，算出来的数必须一样。不然就是分层没做干净。"""
-        from study_coach import cli, session, view_model
+        from study_assistant import cli, session, view_model
 
         state = view_model.state(self.conn)
         self.assertEqual(self.app.state["due_total"], state["due_total"])

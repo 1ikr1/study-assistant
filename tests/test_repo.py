@@ -11,7 +11,7 @@ import shutil
 import unittest
 from pathlib import Path
 
-from study_coach import db, repo, seed
+from study_assistant import db, repo, seed
 
 # 测试临时库统一放在项目内的 .tmp-tests 下。
 # 好处：1) 沙箱/CI 里系统临时目录不一定可写；2) 测试产物位置可预期，方便排查。

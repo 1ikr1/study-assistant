@@ -13,8 +13,8 @@ import shutil
 import unittest
 from pathlib import Path
 
-from study_coach import config
-from study_coach.llm import (
+from study_assistant import config
+from study_assistant.llm import (
     ChatClient,
     LLMError,
     LLMHTTPError,

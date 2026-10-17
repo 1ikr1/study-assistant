@@ -3,7 +3,7 @@
 tkinter 是 Python 标准库自带的，所以这个界面**零下载**——
 不用 pip install 任何东西，`dependencies = []` 这条底线保住了。
 
-这是 study-coach 的第四个壳：
+这是 study-assistant 的第四个壳：
 
     cli.py       一条命令做一件事（适合脚本化）
     session.py   终端里跑菜单
@@ -19,8 +19,8 @@ from __future__ import annotations
 import tkinter as tk
 from pathlib import Path
 
-from study_coach import db, repo, view_model as vm
-from study_coach import seed
+from study_assistant import db, repo, view_model as vm
+from study_assistant import seed
 
 # --------------------------------------------------------------------------
 # 配色。和网页版是同一套，这样两个界面看起来是一个产品。
@@ -86,7 +86,7 @@ class StudyApp:
         self.right = 0
 
         self.root = tk.Tk()
-        self.root.title("study-coach · 备考助手")
+        self.root.title("个人学习助手")
         self.root.geometry("1020x730")
         self.root.minsize(860, 620)
         self.root.configure(bg=BG)
@@ -128,7 +128,7 @@ class StudyApp:
         inner.pack(fill="x")
         inner.pack_propagate(False)
 
-        tk.Label(inner, text="study-coach", bg=PANEL, fg=FG, font=F_TITLE).pack(
+        tk.Label(inner, text="个人学习助手", bg=PANEL, fg=FG, font=F_TITLE).pack(
             side="left", padx=(24, 8))
         tk.Label(inner, text="备考助手", bg=PANEL, fg=DIM, font=F_SUB).pack(side="left")
 
@@ -551,6 +551,6 @@ def run(db_path: str | None = None) -> None:
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(prog="study-desktop", description="study-coach 桌面界面")
+    parser = argparse.ArgumentParser(prog="study-desktop", description="个人学习助手 桌面界面")
     parser.add_argument("--db", default=str(db.DEFAULT_DB))
     run(parser.parse_args().db)
