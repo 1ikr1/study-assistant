@@ -261,6 +261,39 @@
   .glass-frame { fill:none; stroke:var(--glass-line); stroke-width:2; }
   .glass-cap { fill:var(--glass-line); }
 
+  /* ---- 助手对话 ---- */
+  .msg { margin-bottom:13px; }
+  .msg .bubble {
+    padding:11px 15px; font-size:14px; line-height:1.75;
+    white-space:pre-wrap; width:fit-content; max-width:86%;
+  }
+  .msg.user { display:flex; justify-content:flex-end; }
+  .msg.user .bubble {
+    background:var(--green-tint); border-radius:12px 12px 4px 12px;
+  }
+  .msg.ai .bubble {
+    background:var(--panel2); border-radius:12px 12px 12px 4px;
+  }
+  .msg.error .bubble {
+    background:var(--red-tint); border-radius:12px 12px 12px 4px;
+  }
+  .msg .meta { font-size:11px; color:var(--dim2); margin-top:5px; }
+  .trace-item {
+    display:flex; align-items:center; gap:8px; padding:7px 0;
+    border-bottom:1px solid var(--line); font-size:12.5px;
+  }
+  .trace-item:last-child { border-bottom:0; }
+  .trace-item .name { font-family:Consolas,monospace; }
+  .trace-item .kind {
+    font-size:10.5px; padding:1px 6px; border-radius:4px;
+    background:var(--panel2); color:var(--dim);
+  }
+  .trace-item .ms { margin-left:auto; color:var(--dim2); font-size:11px; }
+  .trace-item.ok .dot2 { background:var(--green); }
+  .trace-item.error .dot2 { background:var(--red); }
+  .trace-item.degraded .dot2 { background:var(--yellow); }
+  .dot2 { width:6px; height:6px; border-radius:50%; background:var(--dim2); flex:0 0 6px; }
+
   #offline {
     position:fixed; inset:0; background:var(--overlay); z-index:99;
     display:flex; align-items:center; justify-content:center;
@@ -339,6 +372,7 @@ const RATE_LABELS = ["完全不会", "错了但记得", "错了但想起", "很�
 
 /* ===================== 状态 ===================== */
 const PAGES = [
+  { id: "assistant", label: "助手", group: "main", hint: "多 Agent 协作：查资料 + 算数据 + 出成品" },
   { id: "today", label: "今日行动", group: "main", hint: "今天最值得先完成的事" },
   { id: "plan", label: "安排计划", group: "main", hint: "按科目安排每天做什么" },
   { id: "focus", label: "开始专注", group: "main", hint: "交给沙漏，时间流完就休息" },
@@ -354,6 +388,7 @@ const S = {
   toast: null, busy: false,
   prev: null,        // 刚打完分的那张卡 {card, rating} —— AI 讲题要用
   explain: null,     // 讲题结果 {loading, ok, text, model}
+  chat: { msgs: [], loading: false, trace: [] },
   timer: { total: 50 * 60, remain: 50 * 60, running: false, taskId: null, tick: null },
 };
 function toast(text, bad = false) { S.toast = { text, bad }; }
@@ -399,6 +434,75 @@ function renderShell() {
   const page = PAGES.find(p => p.id === S.page);
   $("#page-title").textContent = page.label;
   $("#page-sub").textContent = page.hint;
+}
+
+/* ===================== 助手（多 Agent） ===================== */
+function viewAssistant() {
+  const c = S.chat;
+  const msgs = c.msgs.map(m => {
+    if (m.role === "user") {
+      return `<div class="msg user"><div class="bubble">${esc(m.text)}</div></div>`;
+    }
+    const badge = m.mode === "multi" ? `多 Agent · ${Math.max(0, (m.trace || []).length - 1)} 步`
+      : m.mode === "degraded" ? "计划不合规，已降级"
+      : m.mode === "error" ? "出错"
+      : "直接回答";
+    return `<div class="msg ${m.mode === "error" ? "error" : "ai"}">
+      <div class="bubble">${esc(m.text)}</div>
+      <div class="meta">${badge}${m.reason ? " · " + esc(m.reason) : ""}</div>
+    </div>`;
+  }).join("");
+
+  const trace = c.trace.length ? c.trace.map(t => `
+    <div class="trace-item ${esc(t.status)}">
+      <span class="dot2"></span>
+      <span class="name">${esc(t.id)}</span>
+      <span class="kind">${t.kind === "code" ? "代码" : "模型"}</span>
+      <span>${esc(t.agent)}</span>
+      <span class="ms">${t.ms}ms</span>
+    </div>`).join("") : `<div class="mini">还没有跑过协作。</div>`;
+
+  return `<div class="cols">
+    <div class="col-main">
+      <div class="card">
+        <div class="row">
+          <input type="text" id="q" style="flex:1;min-width:220px"
+                 placeholder="例如：我今天只有 20 分钟，该复习什么？"
+                 ${c.loading ? "disabled" : ""}>
+          <button class="btn primary" id="send" ${c.loading ? "disabled" : ""}>
+            ${c.loading ? "思考中…" : "发送"}</button>
+        </div>
+        <div class="mini">
+          简单问题一次调用直接答；需要「查数据 + 算 + 出成品」两件以上，才会拆成多个子 Agent。
+        </div>
+      </div>
+      <div class="card">
+        <h2>对话</h2>
+        ${msgs || `<div class="empty">问点什么试试。
+          <div style="font-size:12px;margin-top:6px;color:var(--dim2)">
+            我这一周学得怎么样 ｜ 今天只有 20 分钟该复习什么 ｜ 什么是 B 树
+          </div></div>`}
+        <div id="chat-bottom"></div>
+      </div>
+    </div>
+    <div class="col-side">
+      <div class="card">
+        <h2>协作过程 <span class="hint">谁在跑 · 花了多久</span></h2>
+        ${trace}
+      </div>
+      <div class="card">
+        <h2>计划是怎么被管住的</h2>
+        <div class="mini" style="line-height:1.9">
+          主 Agent 给的是 JSON **建议**，代码逐条校验后才执行：<br>
+          · 子 Agent 必须在白名单里<br>
+          · 最多 4 步<br>
+          · 依赖只能指向前面出现过的步骤<br>
+          · 多步必须以 report 收尾<br>
+          任何一条不过，就降级成直接回答。
+        </div>
+      </div>
+    </div>
+  </div>`;
 }
 
 /* ===================== 今日行动 ===================== */
@@ -801,7 +905,7 @@ function viewSettings() {
 }
 
 /* ===================== 渲染 ===================== */
-const VIEWS = { today: viewToday, plan: viewPlan, focus: viewFocus,
+const VIEWS = { assistant: viewAssistant, today: viewToday, plan: viewPlan, focus: viewFocus,
                 review: viewReview, insight: viewInsight, settings: viewSettings };
 
 function render() {
@@ -818,11 +922,12 @@ document.addEventListener("click", async (e) => {
   if (S.busy) return;
 
   const el = e.target.closest("[data-rate],[data-confirm],[data-drop],[data-task]," +
-    "#reveal,#add-task,#save-daily,#toggle,#reset,[data-preset],#explain");
+    "#reveal,#add-task,#save-daily,#toggle,#reset,[data-preset],#explain,#send");
   if (!el) return;
 
   if (el.id === "reveal") { S.revealed = true; render(); return; }
   if (el.id === "explain") return loadExplain();
+  if (el.id === "send") return sendQuestion();
   if (el.id === "add-task") return addTask();
   if (el.id === "save-daily") return saveDaily();
   if (el.id === "toggle") return toggleTimer();
@@ -840,6 +945,9 @@ document.addEventListener("change", (e) => {
 });
 
 document.addEventListener("keydown", (e) => {
+  if (e.target.id === "q" && e.key === "Enter") {
+    e.preventDefault(); sendQuestion(); return;
+  }
   if (["INPUT", "SELECT", "TEXTAREA"].includes(e.target.tagName)) return;
   if (S.page !== "review") return;
   if (e.code === "Space" && !S.revealed && S.queue[S.index]) {
@@ -980,6 +1088,40 @@ async function rate(rating) {
     await refresh();
   } catch (err) { toast(err.message, true); render(); }
   S.busy = false;
+}
+
+async function sendQuestion() {
+  const input = $("#q");
+  if (!input) return;
+  const q = input.value.trim();
+  if (!q || S.chat.loading) return;
+
+  S.chat.msgs.push({ role: "user", text: q });
+  S.chat.loading = true;
+  render();
+
+  try {
+    const r = await post("/api/agent/chat", { question: q });
+    S.chat.msgs.push({
+      role: "assistant",
+      text: r.answer || "（没有拿到回答）",
+      mode: r.ok === false ? "error" : r.mode,
+      reason: r.reason || "",
+      trace: r.trace || [],
+    });
+    S.chat.trace = r.trace || [];
+  } catch (err) {
+    S.chat.msgs.push({
+      role: "assistant", text: "出错了：" + err.message,
+      mode: "error", reason: "", trace: [],
+    });
+    S.chat.trace = [];
+  }
+
+  S.chat.loading = false;
+  render();
+  const bottom = document.querySelector("#chat-bottom");
+  if (bottom) bottom.scrollIntoView({ block: "end" });
 }
 
 async function loadExplain() {

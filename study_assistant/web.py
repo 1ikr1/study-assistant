@@ -26,7 +26,7 @@ from urllib.parse import parse_qs, urlparse
 
 from study_assistant import config, db, repo, seed
 from study_assistant import view_model as vm
-from study_assistant.llm import ChatClient
+from study_assistant.llm import ChatClient, LLMError
 
 try:  # 只有 Windows 才有，导入失败就算了
     import winreg
@@ -247,6 +247,21 @@ class Handler(BaseHTTPRequestHandler):
                     rating=int(payload["rating"]),
                     style=profile.get("style", ""),
                 ))
+            elif path == "/api/agent/chat":
+                # 多 Agent 编排入口。整条链路都在 orchestrator 里，
+                # 这里只负责把"模型不可用"翻译成人话。
+                from study_assistant import agent
+
+                try:
+                    result = agent.run(
+                        conn, build_client(), str(payload.get("question", "")))
+                except LLMError as exc:
+                    self._json({
+                        "ok": False, "reason": "llm_error",
+                        "answer": f"模型那边出问题了：{exc}", "trace": [],
+                    })
+                    return
+                self._json({"ok": True, **result})
             elif path == "/api/shutdown":
                 self._offline("应用已关闭")
             else:
