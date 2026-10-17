@@ -93,6 +93,107 @@ def get_card(conn: sqlite3.Connection, card_id: int) -> sqlite3.Row | None:
     ).fetchone()
 
 
+def update_card(
+    conn: sqlite3.Connection,
+    card_id: int,
+    *,
+    knowledge_point: str | None = None,
+    question: str | None = None,
+    answer: str | None = None,
+    source: str | None = None,
+) -> None:
+    """改一张卡的内容。只改传进来的字段，没传的保持原样。"""
+    fields, params = [], []
+    for column, value in (
+        ("knowledge_point", knowledge_point),
+        ("question", question),
+        ("answer", answer),
+        ("source", source),
+    ):
+        if value is not None:
+            fields.append(f"{column} = ?")
+            params.append(value)
+    if not fields:
+        return
+    params.append(card_id)
+    cur = conn.execute(f"UPDATE cards SET {', '.join(fields)} WHERE id = ?", params)
+    conn.commit()
+    if cur.rowcount == 0:
+        raise LookupError(f"卡片不存在：{card_id}")
+
+
+def delete_card(conn: sqlite3.Connection, card_id: int) -> None:
+    """删一张卡。card_state / review_logs 靠外键级联一起删掉。"""
+    cur = conn.execute("DELETE FROM cards WHERE id = ?", (card_id,))
+    conn.commit()
+    if cur.rowcount == 0:
+        raise LookupError(f"卡片不存在：{card_id}")
+
+
+def list_cards(
+    conn: sqlite3.Connection,
+    *,
+    subject_id: int | None = None,
+    query: str = "",
+) -> list[sqlite3.Row]:
+    """卡片库列表：支持按科目筛、按关键词搜（题目/知识点/答案）。"""
+    sql = """
+        SELECT c.id, c.knowledge_point, c.question, c.answer, c.source,
+               s.id AS subject_id, s.name AS subject,
+               st.interval_days, st.ef, st.lapses, st.due_at
+          FROM cards c
+          JOIN subjects s     ON s.id = c.subject_id
+          JOIN card_state st  ON st.card_id = c.id
+         WHERE 1 = 1
+    """
+    params: list[object] = []
+    if subject_id is not None:
+        sql += " AND s.id = ?"
+        params.append(subject_id)
+    if query:
+        like = f"%{query}%"
+        sql += (" AND (c.question LIKE ? OR c.knowledge_point LIKE ?"
+                " OR c.answer LIKE ?)")
+        params += [like, like, like]
+    sql += " ORDER BY s.name, c.knowledge_point, c.id"
+    return list(conn.execute(sql, params))
+
+
+def list_subjects(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    return list(conn.execute(
+        "SELECT id, name, exam_date, "
+        "(SELECT COUNT(*) FROM cards c WHERE c.subject_id = subjects.id) AS total "
+        "FROM subjects ORDER BY name"))
+
+
+def update_subject(
+    conn: sqlite3.Connection,
+    subject_id: int,
+    *,
+    name: str | None = None,
+    exam_date: str | None = None,
+) -> None:
+    """改科目名或考试日期。
+
+    exam_date 传空字符串表示"清空考试日期"—— 有些人不设考期。
+    """
+    fields, params = [], []
+    if name:
+        fields.append("name = ?")
+        params.append(name)
+    if exam_date is not None:
+        fields.append("exam_date = ?")
+        params.append(exam_date or None)
+    if not fields:
+        return
+    params.append(subject_id)
+    cur = conn.execute(
+        f"UPDATE subjects SET {', '.join(fields)} WHERE id = ?", params)
+    conn.commit()
+    if cur.rowcount == 0:
+        raise LookupError(f"科目不存在：{subject_id}")
+
+
 # --------------------------------------------------------------------------
 # 查询：今天该复习什么
 # --------------------------------------------------------------------------

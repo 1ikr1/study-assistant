@@ -1,0 +1,77 @@
+{
+  "说明": "分级路由与工具选择的金标准。expect_mode 是期望走的路径，expect_agents 是期望用到的子 Agent（子集匹配）。",
+  "cases": [
+    {
+      "id": "chitchat-1",
+      "question": "你好",
+      "expect_mode": "direct",
+      "expect_agents": []
+    },
+    {
+      "id": "chitchat-2",
+      "question": "谢谢你，辛苦了",
+      "expect_mode": "direct",
+      "expect_agents": []
+    },
+    {
+      "id": "concept-1",
+      "question": "什么是 B 树？和二叉搜索树有什么区别？",
+      "expect_mode": "direct",
+      "expect_agents": []
+    },
+    {
+      "id": "concept-2",
+      "question": "快速排序的最坏情况是什么？为什么会退化成 O(n²)？",
+      "expect_mode": "direct",
+      "expect_agents": []
+    },
+    {
+      "id": "plan-1",
+      "question": "我今天只有 20 分钟，该复习什么？",
+      "expect_mode": "multi",
+      "expect_agents": ["scheduler"]
+    },
+    {
+      "id": "stats-1",
+      "question": "我这一周学得怎么样？",
+      "expect_mode": "multi",
+      "expect_agents": ["stats"]
+    },
+    {
+      "id": "stats-2",
+      "question": "我最薄弱的知识点是哪些？",
+      "expect_mode": "multi",
+      "expect_agents": ["stats"]
+    },
+    {
+      "id": "load-1",
+      "question": "接下来几天会不会一下子堆很多卡要复习？",
+      "expect_mode": "multi",
+      "expect_agents": ["stats"]
+    },
+    {
+      "id": "mixed-1",
+      "question": "我这一周学得怎么样，接下来该先复习什么？",
+      "expect_mode": "multi",
+      "expect_agents": ["stats", "scheduler"]
+    },
+    {
+      "id": "mixed-2",
+      "question": "明天就要考试了，帮我看看现在的掌握情况，再排一下今天的复习顺序",
+      "expect_mode": "multi",
+      "expect_agents": ["stats", "scheduler"]
+    },
+    {
+      "id": "mixed-3",
+      "question": "我这周哪些知识点最弱？只有半小时，先补哪几个？",
+      "expect_mode": "multi",
+      "expect_agents": ["stats", "scheduler"]
+    },
+    {
+      "id": "concept-3",
+      "question": "为什么哈希表查找平均是 O(1)，最坏却是 O(n)？",
+      "expect_mode": "direct",
+      "expect_agents": []
+    }
+  ]
+}

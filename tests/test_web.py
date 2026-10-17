@@ -195,6 +195,86 @@ class TestWrites(Base):
 
 
 # --------------------------------------------------------------------------
+class TestCardLibrary(Base):
+    """卡片库：之前只能靠改 JSON 导入，现在有了正经入口。"""
+
+    def test_list_and_search(self):
+        self.assertEqual(len(self.client.get("/api/cards").json()["cards"]), 20)
+
+        found = self.client.get("/api/cards?q=哈希").json()["cards"]
+        self.assertTrue(found)
+        self.assertTrue(all("哈希" in c["question"] + c["knowledge_point"]
+                            or "哈希" in c["answer"] for c in found))
+
+        none = self.client.get("/api/cards?q=量子力学").json()["cards"]
+        self.assertEqual(none, [])
+
+    def test_add_card(self):
+        r = self.client.post("/api/card/add", json={
+            "subject": "数据结构",
+            "knowledge_point": "红黑树",
+            "question": "红黑树的五条性质是什么？",
+            "answer": "节点非红即黑；根是黑；叶子是黑；红节点的子节点必须是黑；黑高相等。",
+            "source": "教材 Ch7",
+        }).json()
+        self.assertTrue(r["ok"])
+        self.assertEqual(len(self.client.get("/api/cards").json()["cards"]), 21)
+
+        # 新卡立刻到期，可以复习
+        self.assertEqual(self.client.get("/api/dashboard").json()["due_total"], 21)
+
+    def test_add_card_creates_a_new_subject(self):
+        self.client.post("/api/card/add", json={
+            "subject": "英语", "knowledge_point": "虚拟语气",
+            "question": "What is subjunctive mood?",
+            "answer": "表示假设、愿望等非真实情况。",
+        })
+        subjects = self.client.get("/api/subjects").json()["subjects"]
+        self.assertIn("英语", [s["name"] for s in subjects])
+
+    def test_add_card_requires_content(self):
+        r = self.client.post("/api/card/add", json={
+            "subject": "数据结构", "knowledge_point": "x",
+            "question": "", "answer": "y",
+        })
+        self.assertEqual(r.status_code, 422)
+
+    def test_update_card(self):
+        card = self.client.get("/api/cards").json()["cards"][0]
+        self.client.post("/api/card/update", json={
+            "card_id": card["id"],
+            "question": "改过之后的题目",
+        })
+        again = next(c for c in self.client.get("/api/cards").json()["cards"]
+                     if c["id"] == card["id"])
+        self.assertEqual(again["question"], "改过之后的题目")
+        self.assertEqual(again["answer"], card["answer"], "没传的字段不该被清空")
+
+    def test_delete_card(self):
+        card = self.client.get("/api/cards").json()["cards"][0]
+        self.client.post("/api/card/delete", json={"card_id": card["id"]})
+        self.assertEqual(len(self.client.get("/api/cards").json()["cards"]), 19)
+
+    def test_delete_unknown_card_returns_404(self):
+        r = self.client.post("/api/card/delete", json={"card_id": 999999})
+        self.assertEqual(r.status_code, 404)
+
+    def test_update_subject_exam_date(self):
+        subject = self.client.get("/api/subjects").json()["subjects"][0]
+        self.client.post("/api/subject/update", json={
+            "subject_id": subject["id"], "exam_date": "2027-01-15"})
+        d = self.client.get("/api/dashboard").json()
+        self.assertEqual(d["exam_date"], "2027-01-15")
+
+    def test_clear_exam_date(self):
+        subject = self.client.get("/api/subjects").json()["subjects"][0]
+        self.client.post("/api/subject/update", json={
+            "subject_id": subject["id"], "exam_date": ""})
+        d = self.client.get("/api/dashboard").json()
+        self.assertIsNone(d["countdown_days"], "没考期时倒计时应为空")
+
+
+# --------------------------------------------------------------------------
 class TestLLMEndpointsNeverTouchTheNetwork(Base):
     def test_explain_with_fake_model(self):
         def transport(url, headers, body, timeout):
@@ -241,8 +321,14 @@ class TestLLMEndpointsNeverTouchTheNetwork(Base):
             {"id": "s1", "agent": "stats", "args": {"days": 7}},
             {"id": "s2", "agent": "report", "args": {}, "depends_on": ["s1"]},
         ]}, ensure_ascii=False)
+        long_answer = "根据这一周的数据，你的掌握度还不错，最薄弱的是二叉树遍历。"
+        good_review = json.dumps({
+            "scores": {"忠实": 18, "切题": 17, "完整": 16, "清晰": 17, "有用": 16},
+            "issues": [], "summary": "没问题",
+        }, ensure_ascii=False)
 
-        with mock.patch.object(web, "build_client", lambda: Fake(plan, "最终总结")):
+        with mock.patch.object(web, "build_client",
+                               lambda: Fake(plan, long_answer, good_review)):
             r = self.client.post("/api/agent/stream", json={"question": "我这一周怎么样"})
 
         self.assertEqual(r.status_code, 200)
@@ -252,8 +338,9 @@ class TestLLMEndpointsNeverTouchTheNetwork(Base):
                   if line.startswith("data: ")]
         kinds = [e["type"] for e in events]
         self.assertEqual(kinds, ["phase", "mode", "step_start", "step_end",
-                                 "step_start", "step_end", "answer"])
-        self.assertEqual(events[-1]["text"], "最终总结")
+                                 "step_start", "step_end", "gate", "answer"])
+        self.assertEqual(events[-1]["text"], long_answer)
+        self.assertEqual(events[-2]["verdict"], "pass")
 
     def test_agent_stream_reports_model_outage_as_an_event(self):
         """模型不可用不该 500，应该变成一条 error 事件。"""

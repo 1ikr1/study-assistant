@@ -238,6 +238,32 @@ class ChatIn(BaseModel):
     question: str = ""
 
 
+class CardIn(BaseModel):
+    subject: str = ""                       # 科目名，不存在会自动建
+    knowledge_point: str = Field(min_length=1)
+    question: str = Field(min_length=1)
+    answer: str = Field(min_length=1)
+    source: str = ""
+
+
+class CardUpdateIn(BaseModel):
+    card_id: int
+    knowledge_point: str | None = None
+    question: str | None = None
+    answer: str | None = None
+    source: str | None = None
+
+
+class CardIdIn(BaseModel):
+    card_id: int
+
+
+class SubjectIn(BaseModel):
+    subject_id: int
+    name: str | None = None
+    exam_date: str | None = None            # 传空字符串表示清空考期
+
+
 def build_client() -> ChatClient:
     """按 .env 建客户端。每次请求重建 —— 改完 key 立刻生效。"""
     settings = config.llm_settings()
@@ -336,6 +362,22 @@ def create_app(db_path: str | None = None) -> FastAPI:
         finally:
             c.close()
 
+    @app.get("/api/cards")
+    async def cards(q: str = "", subject_id: int | None = None):
+        c = open_conn()
+        try:
+            return {"cards": vm.card_rows(c, subject_id=subject_id, query=q.strip())}
+        finally:
+            c.close()
+
+    @app.get("/api/subjects")
+    async def subjects():
+        c = open_conn()
+        try:
+            return {"subjects": vm.subject_rows(c)}
+        finally:
+            c.close()
+
     @app.get("/api/dashboard")
     async def dashboard():
         c = open_conn()
@@ -425,6 +467,63 @@ def create_app(db_path: str | None = None) -> FastAPI:
                 c, planned_min=body.planned_min, actual_sec=body.actual_sec,
                 finished=body.finished, task_id=body.task_id)
             return {"ok": True, "session_id": session_id}
+        finally:
+            c.close()
+
+    @app.post("/api/card/add")
+    async def card_add(body: CardIn):
+        """新建一张卡。科目不存在就顺手建一个 —— 少一步操作。"""
+        c = open_conn()
+        try:
+            subject_name = body.subject.strip()
+            if not subject_name:
+                rows = repo.list_subjects(c)
+                if not rows:
+                    raise LookupError("还没有科目，先填一个科目名")
+                subject_id = int(rows[0]["id"])
+            else:
+                subject_id = repo.add_subject(c, subject_name)
+
+            card_id = repo.add_card(
+                c, subject_id=subject_id,
+                knowledge_point=body.knowledge_point.strip(),
+                question=body.question.strip(),
+                answer=body.answer.strip(),
+                source=body.source.strip())
+            return {"ok": True, "card_id": card_id}
+        finally:
+            c.close()
+
+    @app.post("/api/card/update")
+    async def card_update(body: CardUpdateIn):
+        c = open_conn()
+        try:
+            repo.update_card(
+                c, body.card_id,
+                knowledge_point=body.knowledge_point,
+                question=body.question,
+                answer=body.answer,
+                source=body.source)
+            return {"ok": True}
+        finally:
+            c.close()
+
+    @app.post("/api/card/delete")
+    async def card_delete(body: CardIdIn):
+        c = open_conn()
+        try:
+            repo.delete_card(c, body.card_id)
+            return {"ok": True}
+        finally:
+            c.close()
+
+    @app.post("/api/subject/update")
+    async def subject_update(body: SubjectIn):
+        c = open_conn()
+        try:
+            repo.update_subject(
+                c, body.subject_id, name=body.name, exam_date=body.exam_date)
+            return {"ok": True}
         finally:
             c.close()
 

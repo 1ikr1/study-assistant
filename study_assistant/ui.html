@@ -254,6 +254,12 @@
     background:var(--panel2); border:1px solid var(--line); color:var(--fg);
     border-radius:7px; padding:7px 10px; font:inherit; font-size:13px;
   }
+  textarea {
+    background:var(--panel2); border:1px solid var(--line); color:var(--fg);
+    border-radius:7px; padding:8px 10px; font:inherit; font-size:13px;
+    width:100%; resize:vertical; line-height:1.7;
+  }
+  textarea:focus { outline:none; border-color:var(--green); }
   input:focus,select:focus { outline:none; border-color:var(--green); }
   label.sw { display:inline-flex; align-items:center; gap:7px; color:var(--dim); font-size:12.5px; cursor:pointer; }
 
@@ -379,6 +385,7 @@ const PAGES = [
   { id: "plan", label: "安排计划", group: "main", hint: "按科目安排每天做什么" },
   { id: "focus", label: "开始专注", group: "main", hint: "交给沙漏，时间流完就休息" },
   { id: "review", label: "错题复习", group: "main", hint: "算法决定什么时候该复习" },
+  { id: "library", label: "卡片库", group: "main", hint: "自己录知识点：加、改、删、搜" },
   { id: "insight", label: "学习洞察", group: "extra", hint: "你的数据长什么样" },
   { id: "settings", label: "设置与数据", group: "extra", hint: "画像与数据库" },
 ];
@@ -391,6 +398,7 @@ const S = {
   prev: null,        // 刚打完分的那张卡 {card, rating} —— AI 讲题要用
   explain: null,     // 讲题结果 {loading, ok, text, model}
   chat: { msgs: [], loading: false, trace: [] },
+  lib: { cards: [], subjects: [], query: "", editingId: null, loaded: false },
   timer: { total: 50 * 60, remain: 50 * 60, running: false, taskId: null, tick: null },
 };
 function toast(text, bad = false) { S.toast = { text, bad }; }
@@ -450,9 +458,13 @@ function viewAssistant() {
       : m.mode === "degraded" ? "计划不合规，已降级"
       : m.mode === "error" ? "出错"
       : "直接回答";
+    const gateText = m.gate && m.gate.verdict
+      ? ` · 自检 ${({ pass: "通过", warn: "有提醒", fail: "未通过", unknown: "未复核" })[m.gate.verdict] || m.gate.verdict}`
+        + (m.gate.score ? ` ${m.gate.score} 分` : "")
+      : "";
     return `<div class="msg ${m.mode === "error" ? "error" : "ai"}">
       <div class="bubble">${esc(m.text)}</div>
-      <div class="meta">${badge}${m.reason ? " · " + esc(m.reason) : ""}</div>
+      <div class="meta">${badge}${gateText}${m.reason ? " · " + esc(m.reason) : ""}</div>
     </div>`;
   }).join("");
 
@@ -818,6 +830,71 @@ function stagedCard() {
       <button class="btn tiny danger" data-drop="${s.id}">丢掉</button>
     </div>`).join("")}</div>`;
 }
+/* ===================== 卡片库 ===================== */
+function viewLibrary() {
+  const L = S.lib;
+  const editing = L.editingId ? L.cards.find(c => c.id === L.editingId) : null;
+
+  const rows = L.cards.map(c => `
+    <div class="task">
+      <span class="meta" style="width:78px">${esc(c.subject)}</span>
+      <span class="name">
+        <b style="font-weight:500">${esc(c.knowledge_point)}</b>
+        <span class="meta" style="margin-left:6px">${esc(c.question)}</span>
+      </span>
+      <span class="meta">间隔 ${c.interval_days} 天</span>
+      <span class="meta">错 ${c.lapses}</span>
+      <button class="btn tiny" data-edit="${c.id}">编辑</button>
+      <button class="btn tiny danger" data-del="${c.id}">删除</button>
+    </div>`).join("");
+
+  const suggestions = L.subjects.map(s => `<option value="${esc(s.name)}"></option>`).join("");
+
+  return `${S.toast ? `<div class="toast ${S.toast.bad ? "bad" : ""}">${esc(S.toast.text)}</div>` : ""}
+  <div class="cols">
+    <div class="col-main">
+      <div class="card">
+        <h2>${editing ? "编辑卡片" : "新建卡片"}
+          ${editing ? `<span class="hint">#${editing.id}</span>` : ""}</h2>
+        <div class="row">
+          <input type="text" id="c-subject" list="subj-list" placeholder="科目（如 数据结构）"
+                 value="${editing ? esc(editing.subject) : ""}" style="width:170px">
+          <datalist id="subj-list">${suggestions}</datalist>
+          <input type="text" id="c-point" placeholder="知识点"
+                 value="${editing ? esc(editing.knowledge_point) : ""}" style="width:170px">
+          <input type="text" id="c-source" placeholder="来源（可选）"
+                 value="${editing ? esc(editing.source) : ""}" style="width:150px">
+        </div>
+        <div style="margin-top:8px">
+          <textarea id="c-question" rows="2"
+            placeholder="题目（先自己想，再翻答案）">${editing ? esc(editing.question) : ""}</textarea>
+        </div>
+        <div style="margin-top:8px">
+          <textarea id="c-answer" rows="3"
+            placeholder="答案">${editing ? esc(editing.answer) : ""}</textarea>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button class="btn primary" id="card-save">
+            ${editing ? "保存修改" : "加入卡片库"}</button>
+          ${editing ? `<button class="btn" id="card-cancel">取消</button>` : ""}
+          <span class="mini" style="margin:0">新卡立刻到期，今天就能开始复习。</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>卡片 <span class="hint">${L.cards.length} 张</span></h2>
+        <div class="row" style="margin-bottom:10px">
+          <input type="text" id="card-q" placeholder="搜题目 / 知识点 / 答案"
+                 value="${esc(L.query)}" style="flex:1;min-width:200px">
+          <button class="btn" id="card-search">搜索</button>
+          ${L.query ? `<button class="btn" id="card-clear">清空</button>` : ""}
+        </div>
+        ${rows || `<div class="empty">没有匹配的卡片。</div>`}
+      </div>
+    </div>
+  </div>`;
+}
+
 /* ===================== 学习洞察 ===================== */
 function budgetBars() {
   const max = Math.max(1, ...S.forecast.map(d => d.count));
@@ -909,7 +986,8 @@ function viewSettings() {
 
 /* ===================== 渲染 ===================== */
 const VIEWS = { assistant: viewAssistant, today: viewToday, plan: viewPlan, focus: viewFocus,
-                review: viewReview, insight: viewInsight, settings: viewSettings };
+                review: viewReview, library: viewLibrary,
+                insight: viewInsight, settings: viewSettings };
 
 function render() {
   renderShell();
@@ -919,18 +997,29 @@ function render() {
 /* ===================== 交互 ===================== */
 document.addEventListener("click", async (e) => {
   const nav = e.target.closest("[data-page]");
-  if (nav) { S.page = nav.dataset.page; S.toast = null; render(); return; }
+  if (nav) {
+    S.page = nav.dataset.page; S.toast = null;
+    if (S.page === "library") { loadLibrary(); return; }   // 进卡片库要先取数据
+    render(); return;
+  }
   if (e.target.closest("#quit")) { await quit(); return; }
   if (e.target.closest("#theme")) { toggleTheme(); return; }
   if (S.busy) return;
 
   const el = e.target.closest("[data-rate],[data-confirm],[data-drop],[data-task]," +
-    "#reveal,#add-task,#save-daily,#toggle,#reset,[data-preset],#explain,#send");
+    "#reveal,#add-task,#save-daily,#toggle,#reset,[data-preset],#explain,#send," +
+    "[data-edit],[data-del],#card-save,#card-cancel,#card-search,#card-clear");
   if (!el) return;
 
   if (el.id === "reveal") { S.revealed = true; render(); return; }
   if (el.id === "explain") return loadExplain();
   if (el.id === "send") return sendQuestion();
+  if (el.dataset.edit) { S.lib.editingId = +el.dataset.edit; render(); return; }
+  if (el.dataset.del) return deleteCard(+el.dataset.del);
+  if (el.id === "card-save") return saveCard();
+  if (el.id === "card-cancel") { S.lib.editingId = null; render(); return; }
+  if (el.id === "card-search") { S.lib.query = $("#card-q").value.trim(); loadLibrary(); return; }
+  if (el.id === "card-clear") { S.lib.query = ""; loadLibrary(); return; }
   if (el.id === "add-task") return addTask();
   if (el.id === "save-daily") return saveDaily();
   if (el.id === "toggle") return toggleTimer();
@@ -944,12 +1033,19 @@ document.addEventListener("click", async (e) => {
 
 document.addEventListener("change", (e) => {
   if (e.target.id === "staged-mode") { S.stagedMode = e.target.checked; render(); }
-  if (e.target.id === "focus-task") S.timer.taskId = e.target.value || null;
+  if (e.target.id === "focus-task") {
+    S.timer.taskId = e.target.value || null;
+    saveTimer();
+  }
 });
 
 document.addEventListener("keydown", (e) => {
   if (e.target.id === "q" && e.key === "Enter") {
     e.preventDefault(); sendQuestion(); return;
+  }
+  if (e.target.id === "card-q" && e.key === "Enter") {
+    e.preventDefault();
+    S.lib.query = e.target.value.trim(); loadLibrary(); return;
   }
   if (["INPUT", "SELECT", "TEXTAREA"].includes(e.target.tagName)) return;
   if (S.page !== "review") return;
@@ -1170,9 +1266,74 @@ function applyAgentEvent(reply, ev) {
   } else if (ev.type === "answer") {
     reply.text = ev.text || "（没有拿到回答）";
     reply.mode = ev.mode || reply.mode;
+  } else if (ev.type === "gate") {
+    reply.gate = ev;
   } else if (ev.type === "error") {
     reply.text = ev.message || "出错了";
     reply.mode = "error";
+  }
+}
+
+/* ---------------- 卡片库 ---------------- */
+async function loadLibrary() {
+  const q = (S.lib.query || "").trim();
+  const suffix = q ? "?q=" + encodeURIComponent(q) : "";
+  try {
+    const [cards, subjects] = await Promise.all([
+      api("/api/cards" + suffix),
+      api("/api/subjects"),
+    ]);
+    S.lib.cards = cards.cards;
+    S.lib.subjects = subjects.subjects;
+    S.lib.loaded = true;
+  } catch (err) {
+    toast("读取卡片失败：" + err.message, true);
+  }
+  render();
+}
+
+async function saveCard() {
+  const subject = $("#c-subject").value.trim();
+  const point = $("#c-point").value.trim();
+  const question = $("#c-question").value.trim();
+  const answer = $("#c-answer").value.trim();
+  const source = $("#c-source").value.trim();
+
+  if (!point || !question || !answer) {
+    toast("知识点、题目、答案三个都要填。", true); render(); return;
+  }
+
+  try {
+    if (S.lib.editingId) {
+      await post("/api/card/update", {
+        card_id: S.lib.editingId,
+        knowledge_point: point, question, answer, source,
+      });
+      toast("已保存修改。");
+    } else {
+      await post("/api/card/add", {
+        subject, knowledge_point: point, question, answer, source,
+      });
+      toast("已加入卡片库 —— 今天就能开始复习。");
+    }
+    S.lib.editingId = null;
+    await loadLibrary();
+    await refresh();          // 今日到期数也跟着变了
+  } catch (err) {
+    toast(err.message, true); render();
+  }
+}
+
+async function deleteCard(id) {
+  if (!confirm("确定删掉这张卡？它的复习记录也会一起消失。")) return;
+  try {
+    await post("/api/card/delete", { card_id: id });
+    if (S.lib.editingId === id) S.lib.editingId = null;
+    toast("已删除。");
+    await loadLibrary();
+    await refresh();
+  } catch (err) {
+    toast(err.message, true); render();
   }
 }
 
@@ -1211,10 +1372,41 @@ async function dropStaged(id) {
 }
 
 /* ===================== 计时器 ===================== */
+/* 计时状态存 localStorage：专注到一半刷新页面，这一轮不该丢。
+   恢复时按"离开的时间"扣掉秒数，但**先暂停**——让人自己决定要不要继续。 */
+const TIMER_KEY = "study-assistant:timer";
+
+function saveTimer() {
+  try {
+    localStorage.setItem(TIMER_KEY, JSON.stringify({
+      total: S.timer.total, remain: S.timer.remain,
+      taskId: S.timer.taskId, running: S.timer.running, at: Date.now(),
+    }));
+  } catch (err) { /* 无痕模式 */ }
+}
+
+function restoreTimer() {
+  try {
+    const raw = localStorage.getItem(TIMER_KEY);
+    if (!raw) return;
+    const d = JSON.parse(raw);
+    if (!d || !d.total) return;
+    let remain = Number(d.remain) || d.total;
+    if (d.running && d.at) {
+      remain = Math.max(0, remain - Math.round((Date.now() - d.at) / 1000));
+    }
+    S.timer.total = d.total;
+    S.timer.remain = remain;
+    S.timer.taskId = d.taskId || null;
+    S.timer.running = false;
+  } catch (err) { /* 存的内容坏了就用默认值 */ }
+}
+
 function setPreset(minutes) {
   if (S.timer.running) return;
   S.timer.total = minutes * 60;
   S.timer.remain = minutes * 60;
+  saveTimer();
   render();
 }
 
@@ -1222,8 +1414,10 @@ function toggleTimer() {
   const t = S.timer;
   if (t.running) { stopTicking(); t.running = false; render(); return; }
   t.running = true;
+  saveTimer();
   t.tick = setInterval(() => {
     t.remain -= 1;
+    saveTimer();
     if (t.remain <= 0) {
       t.remain = 0;
       stopTicking();
@@ -1262,6 +1456,7 @@ async function resetTimer(log) {
   stopTicking();
   t.running = false;
   t.remain = t.total;
+  saveTimer();
   if (log && elapsed >= 30) await logFocus(false, elapsed);
   render();
 }
@@ -1300,6 +1495,7 @@ function beep() {
 }
 
 /* ===================== 启动 ===================== */
+restoreTimer();            // 专注计时跨刷新保留
 syncFullscreenLabel();     // 一进来就把"全屏由谁控制"判断一次
 refresh().catch(err => {
   $("#page-sub").textContent = "连不上后台服务";

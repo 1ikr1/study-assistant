@@ -17,7 +17,7 @@ from typing import Callable
 
 from study_assistant import db
 from study_assistant.agent import graph as graph_mod
-from study_assistant.agent import supervisor
+from study_assistant.agent import quality, supervisor
 from study_assistant.agent.schemas import PlanError
 from study_assistant.llm import ChatClient
 
@@ -34,6 +34,7 @@ def run(
     client: ChatClient,
     question: str,
     on_event: EventSink = None,
+    deep_review: bool = True,
 ) -> dict:
     """跑一次完整的问答。
 
@@ -112,8 +113,18 @@ def run(
         return {"mode": "degraded", "answer": answer,
                 "reason": "收尾步骤失败", "trace": trace}
 
+    # ---- 4. 质量门控 ------------------------------------------------------
+    materials = "\n\n".join(
+        f"【{k}】{v}" for k, v in results.items() if k != last)
+    gate = quality.evaluate(client, question, answer, materials, deep=deep_review)
+    emit({"type": "gate", **gate.to_dict()})
+
+    if gate.verdict == "fail":
+        answer = f"⚠️ 这段回答没过自检（{gate.note or '质量分偏低'}），请谨慎参考。\n\n{answer}"
+
     emit({"type": "answer", "text": answer, "mode": "multi"})
-    return {"mode": "multi", "answer": answer, "reason": plan.reason, "trace": trace}
+    return {"mode": "multi", "answer": answer, "reason": plan.reason,
+            "trace": trace, "gate": gate.to_dict()}
 
 
 def _ms(start: float) -> int:

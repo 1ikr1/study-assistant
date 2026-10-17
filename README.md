@@ -530,7 +530,7 @@ $env:PYTHONIOENCODING = "utf-8"
 & "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe" -m unittest discover -s tests -v
 ```
 
-当前 **160 个测试全过**。测试覆盖的重点不是"代码跑不跑得通"，而是几个**容易悄悄写错的地方**：
+当前 **178 个测试全过**。测试覆盖的重点不是"代码跑不跑得通"，而是几个**容易悄悄写错的地方**：
 
 - 连续满分时，间隔必须是 `1 → 6 → 16`（第三次是 `6 × 2.7 = 16.2`，四舍五入到 16）
 - EF 有下限，反复答错也不能低于 1.3

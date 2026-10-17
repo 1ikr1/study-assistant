@@ -335,6 +335,33 @@ def cmd_desktop(args) -> None:
     desktop.run(args.db)
 
 
+def cmd_eval(args) -> None:
+    """跑评测：分级路由 / 工具选择 / 自检通过率。"""
+    from study_assistant import config, evalharness
+
+    cases = evalharness.load_dataset()
+    hr()
+    print(f"评测集：{len(cases)} 条")
+    hr()
+
+    if args.dry_run:
+        for case in cases:
+            if case["expect_mode"] not in ("direct", "multi"):
+                raise SystemExit(f"用例 {case['id']} 的 expect_mode 不合法")
+        print("数据集格式 OK —— 没调模型，也没花钱。")
+        return
+
+    if not config.llm_configured():
+        print("还没配置 DEEPSEEK_API_KEY，跑不了真评测。")
+        print("（想先验证数据集，加 --dry-run）")
+        return
+
+    report = evalharness.run(evalharness.build_default_client, args.db, cases)
+    print(evalharness.format_report(report))
+    print()
+    print(f"报告已保存：{evalharness.save_report(report)}")
+
+
 # --------------------------------------------------------------------------
 # stats / forecast / profile
 # --------------------------------------------------------------------------
@@ -449,6 +476,10 @@ def main() -> None:
     sub.add_parser(
         "desktop", parents=[common], help="启动原生窗口界面（tkinter，零下载）"
     ).set_defaults(func=cmd_desktop)
+
+    p_eval = sub.add_parser("eval", parents=[common], help="跑评测（分级/工具选择/自检）")
+    p_eval.add_argument("--dry-run", action="store_true", help="只校验数据集，不调模型")
+    p_eval.set_defaults(func=cmd_eval)
 
     sub.add_parser("init", parents=[common], help="建库并导入示例卡片").set_defaults(func=cmd_init)
     sub.add_parser("due", parents=[common], help="今天该复习什么").set_defaults(func=cmd_due)

@@ -129,6 +129,25 @@ def staged(conn: sqlite3.Connection) -> list[dict]:
     ]
 
 
+def card_rows(
+    conn: sqlite3.Connection,
+    *,
+    subject_id: int | None = None,
+    query: str = "",
+) -> list[dict]:
+    """卡片库列表（已经整理成界面好用的形状）。"""
+    out = []
+    for r in repo.list_cards(conn, subject_id=subject_id, query=query):
+        item = dict(r)
+        item["ef"] = round(float(item["ef"]), 2)
+        out.append(item)
+    return out
+
+
+def subject_rows(conn: sqlite3.Connection) -> list[dict]:
+    return [dict(r) for r in repo.list_subjects(conn)]
+
+
 def review_result(result: dict) -> dict:
     """把 repo.apply_review 的返回值整理成界面好显示的形状。"""
     before: SM2State = result["before"]

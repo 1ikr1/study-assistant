@@ -58,6 +58,14 @@ def _plan_json(*tasks, reason="需要算数据 + 出成品") -> str:
                       ensure_ascii=False)
 
 
+# 真实长度的回答（门控会检查长度，太短的假数据会被判不合格）
+LONG_ANSWER = "根据这一周的数据，你的掌握度还不错，最薄弱的是二叉树遍历，建议先复习它。"
+GOOD_REVIEW = json.dumps({
+    "scores": {"忠实": 18, "切题": 17, "完整": 16, "清晰": 17, "有用": 16},
+    "issues": [], "summary": "回答切题且没有编造",
+}, ensure_ascii=False)
+
+
 class Base(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = _make_tmpdir()
@@ -218,12 +226,13 @@ class TestOrchestrator(Base):
             _plan_json(
                 {"id": "s1", "agent": "stats", "args": {"days": 7}},
                 {"id": "s2", "agent": "report", "args": {}, "depends_on": ["s1"]}),
-            "这是最终回答",
+            LONG_ANSWER,
+            GOOD_REVIEW,
         )
         out = orchestrator.run(self.conn, client, "我这一周学得怎么样")
 
         self.assertEqual(out["mode"], "multi")
-        self.assertEqual(out["answer"], "这是最终回答")
+        self.assertEqual(out["answer"], LONG_ANSWER)
         agents = [t["agent"] for t in out["trace"]]
         self.assertEqual(agents, ["supervisor", "stats", "report"])
         self.assertEqual(out["trace"][1]["kind"], "code", "stats 是纯代码")
@@ -236,7 +245,8 @@ class TestOrchestrator(Base):
             _plan_json(
                 {"id": "s1", "agent": "stats", "args": {"days": 7}},
                 {"id": "s2", "agent": "report", "args": {}, "depends_on": ["s1"]}),
-            "最终回答",
+            LONG_ANSWER,
+            GOOD_REVIEW,
         )
         orchestrator.run(self.conn, client, "怎么样")
 
@@ -262,14 +272,15 @@ class TestOrchestrator(Base):
             _plan_json(
                 {"id": "s1", "agent": "stats", "args": {}},
                 {"id": "s2", "agent": "report", "args": {}, "depends_on": ["s1"]}),
-            "带着缺口回答",
+            LONG_ANSWER,
+            GOOD_REVIEW,
         )
         with mock.patch.dict(workers.REGISTRY, broken):
             out = orchestrator.run(self.conn, client, "问题")
 
         self.assertEqual(out["mode"], "multi")
         self.assertEqual(out["trace"][1]["status"], "error")
-        self.assertEqual(out["answer"], "带着缺口回答")
+        self.assertEqual(out["answer"], LONG_ANSWER)
 
     def test_model_down_propagates(self):
         """模型完全不可用是全局问题，应该往上抛，由 web 层翻译成人话。"""
@@ -282,6 +293,92 @@ class TestOrchestrator(Base):
         out = orchestrator.run(self.conn, client, "   ")
         self.assertEqual(out["trace"], [])
         self.assertEqual(client.calls, [])
+
+
+class TestQualityGate(Base):
+    """质量门控：规则层零成本，模型层一次调用，评审不可用绝不当作通过。"""
+
+    MATERIAL = "今日已复习：3 次\n科目 数据结构：20 张卡，掌握度 0.61，累计答错 2"
+
+    def test_extract_numbers(self):
+        from study_assistant.agent import quality
+        self.assertEqual(quality.extract_numbers("间隔 6 天，EF 2.5"),
+                         {"6", "2.5"})
+
+    def test_rule_layer_catches_obvious_problems_without_any_model_call(self):
+        from study_assistant.agent import quality
+        checks = {c["name"]: c["ok"] for c in quality.rule_checks("太短了", self.MATERIAL)}
+        self.assertFalse(checks["长度合理"])
+
+        empty = {c["name"]: c["ok"] for c in quality.rule_checks("", self.MATERIAL)}
+        self.assertFalse(empty["非空"])
+
+        repeated = "这一行重复\n这一行重复\n这一行重复，而且足够长足够长足够长足够长"
+        r = {c["name"]: c["ok"] for c in quality.rule_checks(repeated, self.MATERIAL)}
+        self.assertFalse(r["没有复读"])
+
+    def test_invented_numbers_are_flagged(self):
+        """模型自己算出来的数字必须被标出来 —— 这个项目的卖点就是"算数不交给模型"。"""
+        from study_assistant.agent import quality
+        answer = "你的掌握度是 0.61，但下周会掉到 0.42，还差 17 张卡。"
+        checks = {c["name"]: c for c in quality.rule_checks(answer, self.MATERIAL)}
+        self.assertTrue(checks["数字可溯源"]["ok"] is False)
+        self.assertIn("0.42", checks["数字可溯源"]["detail"])
+
+    def test_hard_failure_skips_the_model_call(self):
+        from study_assistant.agent import quality
+        client = ScriptedClient()          # 一次都不该调
+        result = quality.evaluate(client, "q", "短", self.MATERIAL)
+        self.assertEqual(result.verdict, "fail")
+        self.assertEqual(client.calls, [])
+
+    def test_pass_with_good_review(self):
+        from study_assistant.agent import quality
+        client = ScriptedClient(GOOD_REVIEW)
+        result = quality.evaluate(
+            client, "我这一周怎么样", LONG_ANSWER, self.MATERIAL)
+        self.assertEqual(result.verdict, "pass")
+        self.assertGreaterEqual(result.score, 80)
+
+    def test_low_review_score_fails(self):
+        from study_assistant.agent import quality
+        bad = json.dumps({"scores": {"忠实": 5, "切题": 6, "完整": 5,
+                                     "清晰": 6, "有用": 5},
+                          "issues": ["数字对不上"], "summary": "不可靠"})
+        result = quality.evaluate(ScriptedClient(bad), "q", LONG_ANSWER, self.MATERIAL)
+        self.assertEqual(result.verdict, "fail")
+
+    def test_review_unavailable_is_never_treated_as_pass(self):
+        """最关键的一条：没检查 ≠ 检查通过。"""
+        from study_assistant.agent import quality
+
+        class Dead:
+            model = "dead"
+            def chat(self, *a, **k):
+                raise LLMNotConfigured("没 key")
+
+        result = quality.evaluate(Dead(), "q", LONG_ANSWER, self.MATERIAL)
+        self.assertEqual(result.verdict, "unknown")
+        self.assertIn("未经复核", result.note)
+
+    def test_garbage_review_is_unknown_too(self):
+        from study_assistant.agent import quality
+        result = quality.evaluate(ScriptedClient("我不会写 JSON"),
+                                  "q", LONG_ANSWER, self.MATERIAL)
+        self.assertEqual(result.verdict, "unknown")
+
+    def test_orchestrator_attaches_the_gate_result(self):
+        client = ScriptedClient(
+            _plan_json(
+                {"id": "s1", "agent": "stats", "args": {}},
+                {"id": "s2", "agent": "report", "args": {}, "depends_on": ["s1"]}),
+            LONG_ANSWER,
+            GOOD_REVIEW,
+        )
+        out = orchestrator.run(self.conn, client, "我这一周怎么样")
+        self.assertIn("gate", out)
+        self.assertEqual(out["gate"]["verdict"], "pass")
+        self.assertIn("数字可溯源", [c["name"] for c in out["gate"]["checks"]])
 
 
 if __name__ == "__main__":
